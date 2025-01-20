@@ -1,0 +1,24 @@
+name: 🔬 Experiment Report
+description: Experiment Tracking, Execution, and Results
+title: "[Experiment] "
+labels: ["🔬 Experiment"]
+body:
+  - type: textarea
+    attributes:
+      label: 🌈 Background
+      description: 이 실험의 목적 또는 필요한 이유는 무엇인가요?
+      placeholder: 뭐든지 적어주세요~
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: 📋 Plan
+      description: 실험 단계와 진행할 작업을 정리해 주세요.
+      placeholder: "- [ ] 체크박스를 사용해 실험 계획을 세부적으로 작성하면 좋을 것 같습니다~"
+
+  - type: textarea
+    attributes:
+      label: 👀 See Also
+      description: 참고할 자료나 관련 실험, 추가적으로 알아야할 정보가 있나요?
+      placeholder: 관련 자료를 적어주세요~
