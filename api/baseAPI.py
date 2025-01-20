@@ -1,10 +1,9 @@
 import http.client, json
 
 class BaseAPIExecutor:
-    def __init__(self, host, api_key, api_key_primary_val, request_id):
+    def __init__(self, host, api_key, request_id):
         self._host = host
         self._api_key = api_key
-        self._api_key_primary_val = api_key_primary_val
         self._request_id = request_id
     
     def _send_request(self, endpoint, payload):
@@ -17,10 +16,10 @@ class BaseAPIExecutor:
         """
         
         headers = {
+            'Authorization': self._api_key,
+            'X-NCP-CLOVASTUDIO-REQUEST-ID': self._request_id,
             'Content-Type': 'application/json; charset=utf-8',
-            'X-NCP-CLOVASTUDIO-API-KEY': self._api_key,
-            'X-NCP-APIGW-API-KEY': self._api_key_primary_val,
-            'X-NCP-CLOVASTUDIO-REQUEST-ID': self._request_id
+            'Accept': 'application/json'
         }
         
         conn = http.client.HTTPSConnection(self._host)
