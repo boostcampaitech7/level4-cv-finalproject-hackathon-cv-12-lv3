@@ -2,8 +2,8 @@ from .baseAPI import BaseAPIExecutor
 from config.config import API_CONFIG
 
 class EmbeddingAPI(BaseAPIExecutor):
-    def __init__(self, host, api_key, api_key_primary_val, request_id):
-        super().__init__(host, api_key, api_key_primary_val, request_id)
+    def __init__(self, host, api_key, request_id):
+        super().__init__(host, api_key, request_id)
         self._endpoint = API_CONFIG['embedding_endpoint']
 
     def get_embedding(self, text):
@@ -13,8 +13,8 @@ class EmbeddingAPI(BaseAPIExecutor):
 
 
 class SegmentationAPI(BaseAPIExecutor):
-    def __init__(self, host, api_key, api_key_primary_val, request_id):
-        super().__init__(host, api_key, api_key_primary_val, request_id)
+    def __init__(self, host, api_key, request_id):
+        super().__init__(host, api_key, request_id)
         self._endpoint = API_CONFIG['segmentation_endpoint']
 
     def get_segmentation(self, text, alpha=-100, seg_cnt=-1):
@@ -27,8 +27,8 @@ class SegmentationAPI(BaseAPIExecutor):
         return result.get("topicSeg", "Error")
     
 class ChatCompletionAPI(BaseAPIExecutor):
-    def __init__(self, host, api_key, api_key_primary_val, request_id):
-        super().__init__(host, api_key, api_key_primary_val, request_id)
+    def __init__(self, host, api_key,request_id):
+        super().__init__(host, api_key, request_id)
         self._endpoint = "/testapp/v1/chat-completions/HCX-003"
     
     def get_completion(self, messages, top_p=0.8, top_k=0, max_tokens=4096, 

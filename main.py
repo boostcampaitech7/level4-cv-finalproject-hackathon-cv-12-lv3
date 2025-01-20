@@ -14,13 +14,11 @@ if __name__ == '__main__':
     embedding_api = EmbeddingAPI(
         host=API_CONFIG['host'],
         api_key=API_CONFIG['api_key'],
-        api_key_primary_val=API_CONFIG['api_key_primary_val'],
         request_id=API_CONFIG['request_id']
     )
     chat_api = ChatCompletionAPI(
         host=API_CONFIG['host'],
         api_key=API_CONFIG['api_key'],
-        api_key_primary_val=API_CONFIG['api_key_primary_val'],
         request_id=API_CONFIG['request_id']
     )
     
