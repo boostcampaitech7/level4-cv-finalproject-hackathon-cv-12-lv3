@@ -1,9 +1,10 @@
 from .baseAPI import BaseAPIExecutor
+from config.config import API_CONFIG
 
 class EmbeddingAPI(BaseAPIExecutor):
     def __init__(self, host, api_key, api_key_primary_val, request_id):
         super().__init__(host, api_key, api_key_primary_val, request_id)
-        self._endpoint = "/testapp/v1/api-tools/embedding/v2/6d45e6b66efc41d4bd9f80989797e23a"
+        self._endpoint = API_CONFIG['embedding_endpoint']
 
     def get_embedding(self, text):
         payload = {"text": text}
@@ -14,7 +15,7 @@ class EmbeddingAPI(BaseAPIExecutor):
 class SegmentationAPI(BaseAPIExecutor):
     def __init__(self, host, api_key, api_key_primary_val, request_id):
         super().__init__(host, api_key, api_key_primary_val, request_id)
-        self._endpoint = "/testapp/v1/api-tools/segmentation/de6d5701f0dd4409afda2152ab1691e9"
+        self._endpoint = API_CONFIG['segmentation_endpoint']
 
     def get_segmentation(self, text, alpha=-100, seg_cnt=-1):
         payload = {
