@@ -15,8 +15,8 @@ DB_CONFIG = {
 # NCP API 설정
 API_CONFIG = {
     'host': os.getenv('NCP_HOST'),
+    'host2': os.getenv('NCP_HOST2'),
     'api_key': os.getenv('NCP_API_KEY'),
-    'api_key_primary_val': os.getenv('NCP_API_KEY_PRIMARY_VAL'),
     'request_id': os.getenv('REQUEST_ID'),
     'embedding_endpoint': os.getenv('EMBEDDING_API_ENDPOINT'),
     'segmentation_endpoint': os.getenv('SEGMENTATION_API_ENDPOINT'),

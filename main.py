@@ -3,6 +3,7 @@ from config.config import OCR_CONFIG, API_CONFIG
 from utils import pdf_to_image, images_to_text, clean_text, chunkify_to_num_token, query_and_respond, MultiChatManager
 from api import EmbeddingAPI, ChatCompletionAPI, ChatCompletionsExecutor, SummarizationExecutor
 from datebase import DatabaseConnection, DocumentUploader, SessionManager, PaperManager, ChatHistoryManager
+from sentence_transformers import SentenceTransformer
 
 if __name__ == '__main__':
 
@@ -16,14 +17,15 @@ if __name__ == '__main__':
     논문을 이해하고 분석하는 데 도움을 드릴 수 있어요. 
     어떤 것이든 물어보세요!"""
     
-    # API들
-    embedding_api = EmbeddingAPI(
-        host=API_CONFIG['host'],
-        api_key=API_CONFIG['api_key'],
-        request_id=API_CONFIG['request_id']
-    )
+    # API & 모델 로드
+    # embedding_api = EmbeddingAPI(
+    #     host=API_CONFIG['host2'],
+    #     api_key=API_CONFIG['api_key'],
+    #     request_id=API_CONFIG['request_id']
+    # )
+    model = SentenceTransformer("dragonkue/bge-m3-ko")
     chat_api = ChatCompletionAPI(
-        host=API_CONFIG['host'],
+        host=API_CONFIG['host2'],
         api_key=API_CONFIG['api_key'],
         request_id=API_CONFIG['request_id']
     )
@@ -51,8 +53,9 @@ if __name__ == '__main__':
     
     ## CHUNK + EMBEDDING
     for i in tqdm(chunked_documents, desc="Generating Embeddings", total=len(chunked_documents)):
-        embedding = embedding_api.get_embedding(i["chunk"])
-        i["embedding"] = embedding
+        # embedding = embedding_api.get_embedding(i["chunk"])
+        embedding = model.encode(i["chunk"])
+        i["embedding"] = embedding.tolist()
     
     ## 데이터베이스 연결
     db_connection = DatabaseConnection()
@@ -115,6 +118,7 @@ if __name__ == '__main__':
         # 5. 문서 업로드
         uploader = DocumentUploader(conn)
         uploader.upload_documents(chunked_documents)
+        
         print("문서 업로드가 완료되었습니다.")
 
         # 6. 멀티챗 매니저 초기화
@@ -134,11 +138,10 @@ if __name__ == '__main__':
             relevant_response = query_and_respond(
                 query=user_input,
                 conn=conn,
-                embedding_api=embedding_api,
+                model=model,
                 session_id=session_id,
                 top_k=5
             )
-
             request_data = multichat.prepare_chat_request(user_input, context=relevant_response)
 
             try:
@@ -180,9 +183,3 @@ if __name__ == '__main__':
 
             except Exception as e:
                 print(f"대화 중 오류 발생: {str(e)}")
-    except Exception as e:
-        print(f"대화 전 오류 발생: {str(e)}")
-    finally:
-        if conn:
-            db_connection.close()
-            print("DB connection is closed")

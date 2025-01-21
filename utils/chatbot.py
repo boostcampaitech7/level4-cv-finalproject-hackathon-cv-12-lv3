@@ -38,18 +38,23 @@ def clean_clova_response(response_dict):
         return response_dict['message']['content']
     return "응답을 가져오는데 실패했습니다."
 
-def query_and_respond(query: str, conn, embedding_api, session_id, top_k=3):
+def query_and_respond(query: str, conn, model, session_id, top_k=3):
     """
-    벡터 검색 함수
+    사용자의 쿼리를 임베딩하고, 검색하는 함수
+    :param conn: db 접근
+    :param model: 임베딩 모델
+    :param session_id: 세션 채팅 ID
+    :param top_k: 벡터 서치에서 추출할 Reference의 개수
     """
     try:
-        query_vector = embedding_api.get_embedding(query)
+        query_vector = model.encode(query).tolist()
         matches = search_similar_doc(
             query_vector=query_vector,
             conn=conn,
             session_id=session_id,
             top_k=top_k
         )
+
 
         if matches:
             references = "\n\n".join([
