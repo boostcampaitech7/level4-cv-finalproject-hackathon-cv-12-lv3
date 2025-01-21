@@ -19,7 +19,8 @@ API_CONFIG = {
     'api_key': os.getenv('NCP_API_KEY'),
     'request_id': os.getenv('REQUEST_ID'),
     'embedding_endpoint': os.getenv('EMBEDDING_API_ENDPOINT'),
-    'segmentation_endpoint': os.getenv('SEGMENTATION_API_ENDPOINT')
+    'segmentation_endpoint': os.getenv('SEGMENTATION_API_ENDPOINT'),
+    'chat_completion_endpoint': '/testapp/v1/chat-completions/HCX-003'
 }
 
 # OCR 설정
