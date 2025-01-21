@@ -30,8 +30,8 @@ class SegmentationAPI(BaseAPIExecutor):
         return result.get("topicSeg", "Error")
     
 class ChatCompletionAPI(BaseAPIExecutor):
-    def __init__(self, host, api_key, api_key_primary_val, request_id):
-        super().__init__(host, api_key, api_key_primary_val, request_id)
+    def __init__(self, host, api_key,request_id):
+        super().__init__(host, api_key, request_id)
         self._endpoint = "/testapp/v1/chat-completions/HCX-003"
     
     def get_completion(self, messages, top_p=0.8, top_k=0, max_tokens=4096, 
