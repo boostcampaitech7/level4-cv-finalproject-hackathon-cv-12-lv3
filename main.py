@@ -3,6 +3,7 @@ from config.config import OCR_CONFIG, API_CONFIG
 from utils import pdf_to_image, images_to_text, clean_text, chunkify_to_num_token, query_and_respond
 from api import EmbeddingAPI, ChatCompletionAPI
 from datebase import DatabaseConnection, DocumentUploader
+from sentence_transformers import SentenceTransformer
 
 if __name__ == '__main__':
 
@@ -10,12 +11,14 @@ if __name__ == '__main__':
     File_name = "transformer.pdf"
     CHUNK_SIZE = 256
     
-    # API들
-    embedding_api = EmbeddingAPI(
-        host=API_CONFIG['host2'],
-        api_key=API_CONFIG['api_key'],
-        request_id=API_CONFIG['request_id']
-    )
+    # API & 모델 로드
+    # embedding_api = EmbeddingAPI(
+    #     host=API_CONFIG['host2'],
+    #     api_key=API_CONFIG['api_key'],
+    #     request_id=API_CONFIG['request_id']
+    # )
+    model = SentenceTransformer("dragonkue/bge-m3-ko")
+    
     chat_api = ChatCompletionAPI(
         host=API_CONFIG['host2'],
         api_key=API_CONFIG['api_key'],
@@ -45,8 +48,9 @@ if __name__ == '__main__':
     
     ## CHUNK + EMBEDDING
     for i in tqdm(chunked_documents, desc="Generating Embeddings", total=len(chunked_documents)):
-        embedding = embedding_api.get_embedding(i["chunk"])
-        i["embedding"] = embedding
+        # embedding = embedding_api.get_embedding(i["chunk"])
+        embedding = model.encode(i["chunk"])
+        i["embedding"] = embedding.tolist()
     
     ## 데이터베이스 연결
     db_connection = DatabaseConnection()
@@ -59,7 +63,7 @@ if __name__ == '__main__':
         print("데이터 업로드가 완료되었습니다.")
         
         ## 쿼리 및 응답
-        result = query_and_respond("트랜스포머는 RNN에서 무엇이 개선된거야?", conn, embedding_api, chat_api, top_k=5)
+        result = query_and_respond("트랜스포머는 RNN에서 무엇이 개선된거야?", conn, model=model, chat_api=chat_api, top_k=5)
         print(result)
         
     except Exception as e:

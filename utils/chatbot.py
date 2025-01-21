@@ -37,16 +37,16 @@ def clean_clova_response(response_dict):
         return response_dict['message']['content']
     return "응답을 가져오는데 실패했습니다."
 
-def query_and_respond(query: str, conn, embedding_api, chat_api, top_k=3):
+def query_and_respond(query: str, conn, model, chat_api, top_k=3):
     """
     사용자의 쿼리를 임베딩하고, 검색하는 함수
-    :param conn: db 접근?
-    :param embedding_api: 네이버 임베딩 API
+    :param conn: db 접근
+    :param model: 임베딩 모델
     :param chat_api: 네이버 클로바 채팅 API
     :param top_k: 벡터 서치에서 추출할 Reference의 개수
     """
     try:
-        query_vector = embedding_api.get_embedding(query)
+        query_vector = model.encode(query).tolist()
 
         matches = search_similar_doc(query_vector=query_vector, conn=conn, top_k=top_k)
 
