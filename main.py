@@ -18,7 +18,6 @@ if __name__ == '__main__':
     #     request_id=API_CONFIG['request_id']
     # )
     model = SentenceTransformer("dragonkue/bge-m3-ko")
-    
     chat_api = ChatCompletionAPI(
         host=API_CONFIG['host2'],
         api_key=API_CONFIG['api_key'],
