@@ -17,13 +17,6 @@ if __name__ == '__main__':
     논문을 이해하고 분석하는 데 도움을 드릴 수 있어요. 
     어떤 것이든 물어보세요!"""
     
-    # API & 모델 로드
-    # embedding_api = EmbeddingAPI(
-    #     host=API_CONFIG['host2'],
-    #     api_key=API_CONFIG['api_key'],
-    #     request_id=API_CONFIG['request_id']
-    # )
-    
     model = SentenceTransformer("dragonkue/bge-m3-ko")
     ## 데이터베이스 연결
     db_connection = DatabaseConnection()
