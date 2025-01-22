@@ -23,6 +23,7 @@ if __name__ == '__main__':
     #     api_key=API_CONFIG['api_key'],
     #     request_id=API_CONFIG['request_id']
     # )
+    
     model = SentenceTransformer("dragonkue/bge-m3-ko")
     chat_api = ChatCompletionAPI(
         host=API_CONFIG['host2'],
@@ -34,7 +35,7 @@ if __name__ == '__main__':
     chunked_documents = []
     
     # 로직 시작
-    images = pdf_to_image(File_name)
+    images = pdf_to_image(FILE_NAME)
     print("파일을 이미지로 변경 하였습니다.")
     
     ## PDF -> IMG -> OCR -> CLEAN -> CHUNK
@@ -183,3 +184,9 @@ if __name__ == '__main__':
 
             except Exception as e:
                 print(f"대화 중 오류 발생: {str(e)}")
+    except Exception as e:
+        print(f"대화 전 오류 발생: {str(e)}")
+    finally:
+        if conn:
+            db_connection.close()
+            print("DB connection is closed")
