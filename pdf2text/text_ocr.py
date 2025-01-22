@@ -4,9 +4,8 @@ import os
 class TextOCR :
     name = 'paddleocr'
 
-    def __init__(self, languages):
+    def __init__(self, lang):
         super().__init__()
-        lang = languages[0] if len(languages) > 0 else 'en'
         self.ocr_engine = PaddleOCR(use_angle_cls=True, lang=lang, use_gpu=True)
 
     def ocr(self, img: np.ndarray):
