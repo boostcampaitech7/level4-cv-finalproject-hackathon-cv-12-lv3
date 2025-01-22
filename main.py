@@ -1,6 +1,7 @@
 from tqdm import tqdm
 from config.config import OCR_CONFIG, API_CONFIG
 from utils import pdf_to_image, images_to_text, clean_text, chunkify_to_num_token, query_and_respond, MultiChatManager
+from utils import llm_refine
 from api import EmbeddingAPI, ChatCompletionAPI, ChatCompletionsExecutor, SummarizationExecutor
 from datebase import DatabaseConnection, DocumentUploader, SessionManager, PaperManager, ChatHistoryManager
 from sentence_transformers import SentenceTransformer
@@ -25,19 +26,23 @@ if __name__ == '__main__':
     try:
         # 2. API 초기화
         embedding_api = EmbeddingAPI(
+            host = API_CONFIG['host2'],
+            api_key=API_CONFIG['api_key'],
+            request_id=API_CONFIG['request_id']
+        )
+        completion_executor1 = ChatCompletionAPI(
+            host = API_CONFIG['host'],
+            api_key=API_CONFIG['api_key'],
+            request_id=API_CONFIG['request_id']
+        )        
+        completion_executor2 = ChatCompletionsExecutor(
             host = API_CONFIG['host'],
             api_key=API_CONFIG['api_key'],
             request_id=API_CONFIG['request_id']
         )
 
-        completion_executor = ChatCompletionsExecutor(
-            host = API_CONFIG['host2'],
-            api_key=API_CONFIG['api_key'],
-            request_id=API_CONFIG['request_id']
-        )
-
         summarization_executor = SummarizationExecutor(
-             host = API_CONFIG['host'],
+             host = API_CONFIG['host2'],
             api_key=API_CONFIG['api_key'],
             request_id=API_CONFIG['request_id']
         )
@@ -97,7 +102,14 @@ if __name__ == '__main__':
             user_input = input("사용자: ")
             if user_input.lower() in ['exit', 'quit', '대화종료']:
                 break
-
+            
+            enhaced_query = llm_refine(user_input, completion_executor1)
+            
+            # 8-1. 질의를 강화하기
+            if enhaced_query:
+                print(f"질의강화 검색문: {enhaced_query}")
+                user_input = enhaced_query
+                
             relevant_response = query_and_respond(
                 query=user_input,
                 conn=conn,
@@ -108,7 +120,7 @@ if __name__ == '__main__':
             request_data = multichat.prepare_chat_request(user_input, context=relevant_response)
 
             try:
-                response = completion_executor.execute(request_data, stream=True)
+                response = completion_executor2.execute(request_data, stream=True)
 
                 if response:
                     # 응답 처리
