@@ -1,7 +1,7 @@
 
 class TextOCR:
     def __init__(self):
-        # TODO
+        # TODO : Text OCR을 진행하는 Class
         pass
 
     def ocr(self):

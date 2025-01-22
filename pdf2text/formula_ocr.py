@@ -1,7 +1,7 @@
 
 class FormulaOCR:
     def __init__(self):
-        # TODO
+        # TODO 수식 OCR을 진행하는 Class
         pass
 
     def ocr(self):
