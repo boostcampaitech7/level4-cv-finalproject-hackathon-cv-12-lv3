@@ -1,13 +1,5 @@
-import re
-import torch
-
 from enum import Enum
 from utils import select_device
-from transformers import AutoModelForTokenClassification, AutoProcessor
-from transformers import AutoModel
-from transformers import DonutProcessor, VisionEncoderDecoderModel
-import cv2
-import numpy as np
 from doclayout_yolo import YOLOv10
 
 
@@ -31,37 +23,21 @@ class ElementType(Enum):
 
 class LayoutAnalyzer:
     def __init__(self,
+                 model_path,
                  device: str = None):
         # TODO : Layout Analyzer Class
         self.device = select_device(device)
-        self.processor = DonutProcessor.from_pretrained(
-            "naver-clova-ix/donut-base-finetuned-cord-v2")
-        self.model = VisionEncoderDecoderModel.from_pretrained(
-            "naver-clova-ix/donut-base-finetuned-cord-v2").to(self.device)
-        pass
+        self.model = YOLOv10(model_path).to(self.device)
 
     def parse(self, image):
         # TODO : Layout Analysis process
-        task_prompt = "<s_cord-v2>"
-        decoder_input_ids = self.processor.tokenizer(
-            task_prompt, add_special_tokens=False, return_tensors="pt").input_ids
-
-        pixel_values = self.processor(image, return_tensors="pt").pixel_values
-
-        outputs = self.model.generate(
-            pixel_values.to(self.device),
-            decoder_input_ids=decoder_input_ids.to(self.device),
-            max_length=self.model.decoder.config.max_position_embeddings,
-            pad_token_id=self.processor.tokenizer.pad_token_id,
-            eos_token_id=self.processor.tokenizer.eos_token_id,
-            use_cache=True,
-            bad_words_ids=[[self.processor.tokenizer.unk_token_id]],
-            return_dict_in_generate=True,
+        det_res = self.model.predict(
+            image,
+            imgsz=1024,
+            conf=0.2,
+            device=self.device
         )
-
-        sequence = self.processor.batch_decode(outputs.sequences)[0]
-        sequence = sequence.replace(self.processor.tokenizer.eos_token, "").replace(
-            self.processor.tokenizer.pad_token, "")
-        # remove first task start token
-        sequence = re.sub(r"<.*?>", "", sequence, count=1).strip()
-        return self.processor.token2json(sequence)
+        # Annotate and save the result
+        annotated_frame = det_res[0].plot(
+            pil=True, line_width=5, font_size=20)
+        return annotated_frame
