@@ -32,7 +32,6 @@ class LayoutAnalyzer:
                  device: str = None):
         # TODO : Layout Analyzer Class
         self.device = select_device(device)
-        #self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = YOLOv10(model_path).to(self.device)
 
     def parse(self, image, reshape_size=1024, confidence=0.2):
