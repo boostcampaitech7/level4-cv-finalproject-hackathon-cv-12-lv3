@@ -1,9 +1,15 @@
+from paddleocr import PaddleOCR
+class TextOCR :
+    name = 'paddleocr'
 
-class TextOCR:
-    def __init__(self):
-        # TODO : Text OCR을 진행하는 Class
-        pass
+    def __init__(self, lang):
+        super().__init__()
+        self.ocr_engine = PaddleOCR(use_angle_cls=True, lang=lang, use_gpu=True)
 
-    def ocr(self):
-        # TODO: Text OCR 구현
-        return "추출 텍스트"
+    def ocr(self, img: np.ndarray):
+        """
+        텍스트 박스만 감지.
+        """
+        result = self.ocr_engine.ocr(img, det=True, rec=True, cls=False)
+
+        return result
