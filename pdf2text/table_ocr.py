@@ -1,7 +1,5 @@
-
-class TalbeOCR:
+class TableOCR:
     def __init__(self):
-        # TODO : 표를 인식하는 Class
         pass
 
     def ocr(self):
