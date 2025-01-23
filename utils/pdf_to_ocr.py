@@ -21,6 +21,8 @@ def pdf_to_image(pdf_path):
 
 
 def images_to_text(image, ocr_host, ocr_secret_key):
+    # TODO 구현한 pdf2text 이식
+    # TODO Table OCR 이전에 crop한 image patch에 margin을 더해주면 성능 향상이 된다는 정보
     """
     이미지 파일에서 텍스트를 추출하고 후처리하여 반환하는 함수
     :param image: PIL Image 객체

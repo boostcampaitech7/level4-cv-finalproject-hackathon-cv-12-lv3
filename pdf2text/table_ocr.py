@@ -93,8 +93,37 @@ class TableOCR:
             outputs = self.structure_model(
                 image_tensor.unsqueeze(0).to(self.device))
 
-        print(outputs)
+        parsing_outputs = parse_structure_model_outputs(outputs, img.size)
 
 
-def parse_structure_model_outputs():
-    pass
+def parse_structure_model_outputs(outputs, table_size):
+    # outputs의 label 추출, (values, indices)
+    outputs_info = outputs['logits'].softmax(-1).max(-1)
+
+    # labels, prob 추출
+    pred_labels = outputs_info.indices.detach().cpu().squeeze().tolist()
+    pred_prob = outputs_info.values.detach().cpu().squeeze().tolist()
+
+    # 예측 박스 추출 [center_x, center_y, w, h]
+    pred_bboxes = outputs['pred_boxes'].detach().cpu().squeeze()
+    pred_bboxes = [bbox.tolist()
+                   for bbox in cxcywh_to_xyxy(pred_bboxes, table_size)]
+
+    def template(label, prob, bbox): return {
+        'lable': label, 'prob': prob, 'bbox': bbox}
+
+    results = [template(CLASS_IDX2NAME[l], p, bb) for l, p, bb in zip(
+        pred_labels, pred_prob, pred_bboxes) if CLASS_IDX2NAME[l] != "no object"]
+
+    return results
+
+
+def cxcywh_to_xyxy(bboxes, table_size):
+    table_w, table_h = table_size
+
+    center_x, center_y, w, h = bboxes.unbind(-1)
+    # xmin, ymin, xmax, ymax
+    change_bboxes = [center_x - w * 0.5, center_y - h * 0.5,
+                     center_x + w * 0.5, center_y + h * 0.5]
+    change_bboxes = torch.stack(change_bboxes, dim=1)
+    return change_bboxes * torch.Tensor([table_w, table_h, table_w, table_h])
