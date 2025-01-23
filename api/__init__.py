@@ -1,5 +1,5 @@
 from .naver_ocr import OCRAPIExecutor
-from .api_classes import EmbeddingAPI, ChatCompletionAPI, ChatCompletionsExecutor, SummarizationExecutor
+from .api_classes import EmbeddingAPI, ChatCompletionsExecutor, SummarizationExecutor
 
-__all__ = ['OCRAPIExecutor','EmbeddingAPI','ChatCompletionAPI', 'ChatCompletionsExecutor',
+__all__ = ['OCRAPIExecutor','EmbeddingAPI', 'ChatCompletionsExecutor',
            'SummarizationExecutor']
