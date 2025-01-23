@@ -106,36 +106,4 @@ def init_db(remove_exists=False):
     )
     db.create_tables([_TranslationCache], safe=True)
 
-
-def init_test_db():
-    import tempfile
-
-    cache_db_path = tempfile.mktemp(suffix=".db")
-    test_db = SqliteDatabase(
-        cache_db_path,
-        pragmas={
-            "journal_mode": "wal",
-            "busy_timeout": 1000,
-        },
-    )
-    test_db.bind([_TranslationCache], bind_refs=False, bind_backrefs=False)
-    test_db.connect()
-    test_db.create_tables([_TranslationCache], safe=True)
-    return test_db
-
-
-def clean_test_db(test_db):
-    test_db.drop_tables([_TranslationCache])
-    test_db.close()
-    db_path = test_db.database
-    if os.path.exists(db_path):
-        os.remove(test_db.database)
-    wal_path = db_path + "-wal"
-    if os.path.exists(wal_path):
-        os.remove(wal_path)
-    shm_path = db_path + "-shm"
-    if os.path.exists(shm_path):
-        os.remove(shm_path)
-
-
 init_db()
