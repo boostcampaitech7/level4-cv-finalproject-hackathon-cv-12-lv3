@@ -141,7 +141,7 @@ def intersection_ratio_for_b1(b1, b2):
 def build_table_from_objects(objects):
     # 각 테이블 객체가 테이블 전체를 나타내는 박스를 가짐.
     tables = [ele for ele in objects if ele['label'] == 'table']
-    table_structure = []
+    table_structures = []
 
     for table in tables:
         # table 내부에 포함되는 객체 추출
@@ -151,8 +151,8 @@ def build_table_from_objects(objects):
 
         structure = {}
         # table 내부 객체 간 type에 따른 구분
-        columns = [obj for obj in objects_in_table if obj['label']
-                   == 'table column']
+        cols = [obj for obj in objects_in_table if obj['label']
+                == 'table column']
         rows = [obj for obj in objects_in_table if obj['label'] == 'table row']
 
         # col header를 의미
@@ -163,32 +163,53 @@ def build_table_from_objects(objects):
         extended_cells = [
             obj for obj in objects_in_table if obj['label'] == 'table spanning cell']
 
-        # for obj in extended_cells:
-        #     obj['projected row header'] = False
+        for obj in extended_cells:
+            obj['projected row header'] = False
 
         row_headers = [obj for obj in objects_in_table if obj['label']
                        == 'table projected row header']
 
-        # for obj in row_headers:
-        #     obj['projected row header'] = True
+        for obj in row_headers:
+            obj['projected row header'] = True
 
         extended_cells.extend(row_headers)
 
-        # for obj in rows:
-        #     obj['column header'] = False
-        #     for header_obj in col_headers:
-        #         if iob(obj['bbox'], header_obj['bbox']) >= 0.5:
-        #             obj['column header'] = True
+        for obj in rows:
+            obj['col header'] = False
+            for header_obj in col_headers:
+                if intersection_ratio_for_b1(obj['bbox'], header_obj['bbox']) >= 0.5:
+                    obj['col header'] = True
 
         rows = refine_lines('rows', rows, 0.5)
-        columns = refine_lines('cols', columns, 0.25)
+        cols = refine_lines('cols', cols, 0.25)
 
-        print(rows)
+        # Table 크기 조정
+        row_rect = Rect()
+        for obj in rows:
+            row_rect.include_rect(obj['bbox'])
 
-        # # Table 크기 조정
-        # row_rect = Rect()
-        # for obj in rows:
-        #     row_rect.include_rect(obj['bbox'])
+        col_rect = Rect()
+        for obj in cols:
+            col_rect.include_rect(obj['bbox'])
+
+        # 실질적인 row와 col이 차지하는 좌표를 통해서
+        # table 좌표 업데이트
+        table['row_col_bbox'] = [
+            col_rect[0],  # xmin
+            row_rect[1],  # ymin
+            col_rect[2],  # xmax
+            row_rect[3]  # ymax
+        ]
+        table['bbox'] = table['row_col_bbox']
+
+        # 열과 행을 정렬하는 후처리를 통해서 일관된 테이블 구조 생성
+        rows = align_lines('rows', rows, table['bbox'])
+        cols = align_lines('cols', cols, table['bbox'])
+
+        structure['rows'] = rows
+        structure['cols'] = cols
+        structure['col headers'] = col_headers
+        structure['extended cells'] = extended_cells
 
 
 def refine_lines(mode, lines, threshold):
@@ -228,3 +249,13 @@ def refine_lines(mode, lines, threshold):
     axis_range = (1, 3) if mode == 'rows' else (0, 2)
 
     return sorted(lines, key=lambda x: x['bbox'][axis_range[0]] + x['bbox'][axis_range[1]])
+
+
+def align_lines(mode, lines, standard):
+    assert mode in ('rows', 'cols')
+
+    axis_range = (0, 2) if mode == 'rows' else (1, 3)
+    for line in lines:
+        line['bbox'][axis_range[0]] = standard[axis_range[0]]
+        line['bbox'][axis_range[1]] = standard[axis_range[1]]
+    return lines
