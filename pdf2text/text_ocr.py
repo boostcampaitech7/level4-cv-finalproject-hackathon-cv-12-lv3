@@ -1,4 +1,5 @@
 from paddleocr import PaddleOCR
+import numpy as np
 class TextOCR :
     name = 'paddleocr'
 
