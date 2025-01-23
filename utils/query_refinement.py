@@ -3,49 +3,69 @@ import json
 
 # 프롬프트 템플릿
 QUERY_ENHANCEMENT_PROMPT = """
-역할: 당신은 학술 논문 검색 최적화 전문가입니다. 사용자의 질문을 학술적 맥락에 맞는 자연어 형태로 변환하여, 논문 검색 시 더 정확하고 풍부한 결과를 얻을 수 있도록 돕습니다.
+역할: 당신은 사용자의 질문을 더 명확하고 구체적으로 만들어주는 도우미입니다. 사용자의 질문을 분석하여 의도를 파악하고, 더 명확하고 구체적인 형태로 변환합니다.
 
 입력: {user_query}
 
 지침:
-1. 사용자의 질문을 분석하여 연구 목적을 파악합니다.
-2. 질문을 학술적 맥락에 맞게 재구성합니다. 이때, 관련된 학술 용어, 키워드, 또는 개념을 포함시킵니다.
-3. 최종적으로 완성된 자연어 문장은 논문 검색 엔진에서 사용하기 적합해야 합니다.
+1. 사용자의 질문을 분석하여 의도를 파악합니다.
+2. 질문이 불완전하거나 모호한 경우, 이를 더 명확하고 구체적인 형태로 재구성합니다.
+3. 질문의 핵심 의도를 유지하면서, 필요한 세부 사항을 추가합니다.
+4. 질문이 이미 명확하고 구체적이라면, 원래 질문을 그대로 반환합니다.
 
 출력 형식:
-- 최적화된 검색문: [자연어 형태의 학술적 질의]
+- 최적화된 검색문: [명확하고 구체적인 질문]
 
 예시 1:
-입력: "딥러닝으로 주가 예측하는 방법 알려줘"
-최적화된 검색문: "딥러닝과 시계열 분석을 활용한 주식 시장 예측 모델의 연구 방법론과 성능 평가에 대한 최신 연구"
+입력: "encoder-decoder structure에 대해 간단하게 알려줘"
+최적화된 검색문: "Encoder-Decoder 구조의 기본 개념과 작동 원리를 간단히 설명해주세요."
 
 예시 2:
-입력: "트랜스포머가 RNN보다 좋은 점"
-최적화된 검색문: "트랜스포머와 RNN 아키텍처의 비교 분석: 장단점 및 자연어 처리 작업에서의 성능 차이"
+입력: "딥러닝으로 주가 예측하는 방법 알려줘"
+최적화된 검색문: "딥러닝을 사용하여 주가를 예측하는 방법과 주요 알고리즘에 대해 설명해주세요."
 
 예시 3:
+입력: "트랜스포머가 RNN보다 좋은 점"
+최적화된 검색문: "트랜스포머와 RNN을 비교했을 때, 트랜스포머의 장점과 단점은 무엇인가요?"
+
+예시 4:
 입력: "똥이 마려운 이유?"
-최적화된 검색문: "직장 내압 증가와 관련된 신경 전달 물질 및 수용체의 역할에 대한 생리학적 연구"
+최적화된 검색문: "똥이 마려운 이유는 무엇인가요? 생리학적 원리를 설명해주세요."
+
+예시 5:
+입력: "날씨가 어떠니?"
+최적화된 검색문: "현재 날씨는 어떤가요?"
+
+예시 6:
+입력: "너는 누구니?"
+최적화된 검색문: "당신은 누구인가요?"
 """
+
 
 def extract_enhanced_query(llm_response):
     """
     LLM 응답에서 최적화된 검색문을 추출하는 함수
-    :param llm_response: LLM의 응답 (JSON 형식)
+    :param llm_response: LLM의 응답 (JSON 문자열 또는 파이썬 딕셔너리)
     :return: 최적화된 검색문 (str) 또는 None
     """
     if not llm_response:
         return None
 
     try:
-        response_json = json.loads(llm_response)
-        content = response_json["result"]["message"]["content"]
+        if isinstance(llm_response, str):
+            response_json = json.loads(llm_response)
+        elif isinstance(llm_response, dict):
+            response_json = llm_response
+        else:
+            raise ValueError("llm_response는 JSON 문자열 또는 딕셔너리여야 합니다.")
+        content = response_json["message"]["content"]
         enhanced_query_match = re.search(r'최적화된 검색문\s*:\s*"(.*?)"', content)
         if enhanced_query_match:
             return enhanced_query_match.group(1).strip()
-    except (json.JSONDecodeError, KeyError) as e:
-        print(f"JSON 파싱 중 에러 발생: {e}")
+    except (json.JSONDecodeError, KeyError, ValueError) as e:
+        print(f"오류 발생: {e}")
     return None
+
 
 def llm_refine(query, completion_executor):
     """
@@ -67,7 +87,7 @@ def llm_refine(query, completion_executor):
         'seed': 0
     }
 
-    llm_response = completion_executor.execute(request_data)
+    llm_response = completion_executor.execute(request_data,stream=False)
     enhanced_query = extract_enhanced_query(llm_response)
 
     return enhanced_query

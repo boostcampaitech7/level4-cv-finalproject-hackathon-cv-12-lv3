@@ -29,44 +29,67 @@ class SegmentationAPI(BaseAPIExecutor):
         result = self.execute(self._endpoint, payload)
         return result.get("topicSeg", "Error")
     
-class ChatCompletionAPI(BaseAPIExecutor):
-    def __init__(self, host, api_key,request_id):
-        super().__init__(host, api_key, request_id)
-        self._endpoint = "/testapp/v1/chat-completions/HCX-003"
-    
-    def get_completion(self, messages, top_p=0.8, top_k=0, max_tokens=4096, 
-                      temperature=0.5, repeat_penalty=5.0, stop_before=None, 
-                      include_ai_filters=True, seed=0):
-        """
-        챗봇 응답을 생성하는 메서드
-        :param messages: 대화 메시지 목록
-        :param top_p: 상위 확률 샘플링 임계값
-        :param top_k: 상위 k개 토큰 샘플링
-        :param max_tokens: 최대 생성 토큰 수
-        :param temperature: 생성 다양성 조절
-        :param repeat_penalty: 반복 패널티
-        :param stop_before: 생성 중단 토큰 목록
-        :param include_ai_filters: AI 필터 포함 여부
-        :param seed: 랜덤 시드
-        :return: API 응답 결과
-        """
-        if stop_before is None:
-            stop_before = []
-            
-        payload = {
-            'messages': messages,
-            'topP': top_p,
-            'topK': top_k,
-            'maxTokens': max_tokens,
-            'temperature': temperature,
-            'repeatPenalty': repeat_penalty,
-            'stopBefore': stop_before,
-            'includeAiFilters': include_ai_filters,
-            'seed': seed
-        }
-        
-        result = self.execute(self._endpoint, payload)
-        return result
+# class ChatCompletionAPI(BaseAPIExecutor):
+#     def __init__(self, host, api_key, request_id):
+#         super().__init__(host, api_key, request_id)
+#         self._endpoint = API_CONFIG['chat_completion_endpoint']
+
+#     def get_completion(self, messages, top_p=0.8, top_k=0, max_tokens=4096,
+#                        temperature=0.5, repeat_penalty=5.0, stop_before=None,
+#                        include_ai_filters=True, seed=0):
+#         """
+#         챗봇 응답을 생성하는 메서드 (비스트리밍 방식)
+#         :param messages: 대화 메시지 목록
+#         :param top_p: 상위 확률 샘플링 임계값
+#         :param top_k: 상위 k개 토큰 샘플링
+#         :param max_tokens: 최대 생성 토큰 수
+#         :param temperature: 생성 다양성 조절
+#         :param repeat_penalty: 반복 패널티
+#         :param stop_before: 생성 중단 토큰 목록
+#         :param include_ai_filters: AI 필터 포함 여부
+#         :param seed: 랜덤 시드
+#         :return: API 응답 결과
+#         """
+#         if stop_before is None:
+#             stop_before = []
+
+#         # 요청 데이터 구성
+#         payload = {
+#             'messages': messages,
+#             'topP': top_p,
+#             'topK': top_k,
+#             'maxTokens': max_tokens,
+#             'temperature': temperature,
+#             'repeatPenalty': repeat_penalty,
+#             'stopBefore': stop_before,
+#             'includeAiFilters': include_ai_filters,
+#             'seed': seed
+#         }
+
+#         # 요청 헤더 구성
+#         headers = {
+#             'Content-Type': 'application/json; charset=utf-8',
+#             'Authorization': self._api_key,
+#             'X-NCP-CLOVASTUDIO-REQUEST-ID': self._request_id,
+#             'Accept': 'application/json'  # 비스트리밍 방식
+#         }
+
+#         # API 요청 보내기
+#         try:
+#             response = requests.post(
+#                 self._host + self._endpoint,  # 전체 URL
+#                 headers=headers,
+#                 json=payload
+#             )
+
+#             # 응답 처리
+#             if response.status_code == HTTPStatus.OK:
+#                 return response.json()  # JSON 응답 반환
+#             else:
+#                 raise ValueError(f"HTTP 오류: {response.status_code}, 메시지: {response.text}")
+#         except Exception as e:
+#             print(f"상세 에러: {str(e)}")
+#             raise ValueError(f"API 요청 중 오류 발생: {str(e)}")
     
 class ChatCompletionsExecutor(BaseAPIExecutor):
     def __init__(self, host, api_key, request_id):
@@ -107,7 +130,7 @@ class ChatCompletionsExecutor(BaseAPIExecutor):
                 else:
                     raise ValueError(f"오류 발생[1]: HTTP {r.status_code}, 메시지: {r.text}")
         else:
-            return super().execute(self._endpoint, completion_request)
+            return super().execute(self._endpoint, payload=completion_request)
                 
 class SummarizationExecutor(BaseAPIExecutor):
     def __init__(self, host, api_key, request_id):
@@ -121,7 +144,7 @@ class SummarizationExecutor(BaseAPIExecutor):
                                                            True),
             "segCount": completion_request.get("segCount", -1)
         }
-        res, status = super().execute(payload=payload)
+        res, status = super().execute(self._endpoint, payload)
         if status == HTTPStatus.OK and "result" in res:
             return res["result"]["text"]
         else:
