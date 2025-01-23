@@ -27,15 +27,10 @@ def extractive_summarization(preprocessed_text, lang):
 def abstractive_summarization(extracted_sentences):
     extracted_text = " ".join(extracted_sentences)
 
-    # chat_api = ChatCompletionAPI(
-    #     host = API_CONFIG["host"],
-    #     api_key = API_CONFIG["api_key"],
-    #     request_id=API_CONFIG["request_id"],
-    # )
     chat_api = ChatCompletionAPI(
-        host='clovastudio.stream.ntruss.com',
-        api_key='Bearer nv-b9d7d7c3b9374204a2b486e3dcc18a9aER2R',
-        request_id='3e9deb64e18447d48d8ee7562c8eb4f6'
+        host = API_CONFIG["host2"],
+        api_key = API_CONFIG["api_key"],
+        request_id=API_CONFIG["request_id"],
     )
     messages = [
         {"role": "system", "content": 
@@ -64,7 +59,7 @@ Remember to:
 if __name__ == "__main__":
     # Example Usage (replace with your actual preprocessed text)
     from pathlib import Path
-    file_path = Path('/Users/haneol/Documents/Coding/multilevel-summary.txt')
+    file_path = Path('./multilevel-summary.txt')
     preprocessed_text = file_path.read_text()
     print(preprocessed_text)
     extracted_summary = extractive_summarization(preprocessed_text, lang="en")
