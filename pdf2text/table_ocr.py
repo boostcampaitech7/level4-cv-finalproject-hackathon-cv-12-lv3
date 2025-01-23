@@ -1,8 +1,13 @@
 import numpy as np
+import torch
+
+
 from PIL import Image
 from utils import select_device
-from transformers import AutoImageProcessor, AutoModelForObjectDetection
+# from transformers import AutoImageProcessor, AutoModelForObjectDetection
+from transformers import TableTransformerForObjectDetection
 from torchvision import transforms
+from pathlib import Path
 
 
 CLASS_NAME2IDX = {
@@ -62,8 +67,10 @@ class TableOCR:
         # 테이블 구조 파악을 위한 모델 준비
         # self.processor = AutoImageProcessor.from_pretrained(
         #     "microsoft/table-transformer-structure-recognition")
-        self.structure_model = AutoModelForObjectDetection.from_pretrained(
-            "microsoft/table-transformer-structure-recognition")
+        # self.structure_model = AutoModelForObjectDetection.from_pretrained(
+        #     "microsoft/table-transformer-structure-recognition").to(self.device)
+        self.structure_model = TableTransformerForObjectDetection.from_pretrained(
+            "microsoft/table-transformer-structure-recognition").to(self.device)
         self.structure_model.eval()
 
     def ocr(self, image):
@@ -74,6 +81,20 @@ class TableOCR:
             img = Image.fromarray(image).convert("RGB")
         else:
             raise TypeError(
-                "Invalid Input Type : Expected an instance of Image.Image or np.ndarray, but received{type(image)}")
+                f"Invalid Input Type : Expected an instance of Image.Image or np.ndarray, but received{type(image)}")
 
-        image_tensor = STRUCTURE_TRANSFORM(image)
+        # Image.Image -> Tensor
+        image_tensor = STRUCTURE_TRANSFORM(img)
+        assert isinstance(
+            image_tensor, torch.Tensor), f"Expected an instance of torch.Tensor, but received{type(image_tensor)}"
+
+        # Table 구조 파악
+        with torch.no_grad():
+            outputs = self.structure_model(
+                image_tensor.unsqueeze(0).to(self.device))
+
+        print(outputs)
+
+
+def parse_structure_model_outputs():
+    pass
