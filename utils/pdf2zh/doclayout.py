@@ -8,9 +8,6 @@ import onnx
 import onnxruntime
 from huggingface_hub import hf_hub_download
 
-from pdf2zh.config import ConfigManager
-
-
 class DocLayoutModel(abc.ABC):
     @staticmethod
     def load_onnx():
@@ -74,17 +71,7 @@ class OnnxModel(DocLayoutModel):
 
     @staticmethod
     def from_pretrained(repo_id: str, filename: str):
-        if ConfigManager.get("USE_MODELSCOPE", "0") == "1":
-            repo_mapping = {
-                # Edit here to add more models
-                "wybxc/DocLayout-YOLO-DocStructBench-onnx": "AI-ModelScope/DocLayout-YOLO-DocStructBench-onnx"
-            }
-            from modelscope import snapshot_download
-
-            model_dir = snapshot_download(repo_mapping[repo_id])
-            pth = os.path.join(model_dir, filename)
-        else:
-            pth = hf_hub_download(repo_id=repo_id, filename=filename, etag_timeout=1)
+        pth = hf_hub_download(repo_id=repo_id, filename=filename, etag_timeout=1)
         return OnnxModel(pth)
 
     @property

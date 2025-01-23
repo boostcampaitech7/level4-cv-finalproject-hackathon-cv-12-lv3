@@ -13,8 +13,6 @@ from typing import List, Optional
 from pdf2zh import __version__, log
 from pdf2zh.high_level import translate
 from pdf2zh.doclayout import OnnxModel, ModelInstance
-from pdf2zh.config import ConfigManager
-
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__, add_help=True)

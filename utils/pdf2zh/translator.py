@@ -4,10 +4,6 @@ import os
 import re
 import unicodedata
 from copy import copy
-import deepl
-import ollama
-import openai
-import xinference_client
 import requests
 from pdf2zh.cache import TranslationCache
 from azure.ai.translation.text import TextTranslationClient
@@ -19,13 +15,9 @@ from tencentcloud.tmt.v20180321.models import TextTranslateResponse
 import argostranslate.package
 import argostranslate.translate
 
-import json
-from pdf2zh.config import ConfigManager
-
 
 def remove_control_characters(s):
     return "".join(ch for ch in s if unicodedata.category(ch)[0] != "C")
-
 
 class BaseTranslator:
     name = "base"
@@ -35,12 +27,14 @@ class BaseTranslator:
     ignore_cache = False
 
     def __init__(self, lang_in, lang_out, model):
+        # 언어 매핑 처리
         lang_in = self.lang_map.get(lang_in.lower(), lang_in)
         lang_out = self.lang_map.get(lang_out.lower(), lang_out)
         self.lang_in = lang_in
         self.lang_out = lang_out
         self.model = model
 
+        # TranslationCache 인스턴스 생성
         self.cache = TranslationCache(
             self.name,
             {
@@ -51,56 +45,49 @@ class BaseTranslator:
         )
 
     def set_envs(self, envs):
-        # Detach from self.__class__.envs
-        # Cannot use self.envs = copy(self.__class__.envs)
-        # because if set_envs called twice, the second call will override the first call
-        self.envs = copy(self.envs)
-        if ConfigManager.get_translator_by_name(self.name):
-            self.envs = ConfigManager.get_translator_by_name(self.name)
-        needUpdate = False
+        """
+        환경 변수 설정. 
+        """
+        self.envs = envs or {}
+
+        # 시스템 환경 변수로부터 envs 업데이트
         for key in self.envs:
             if key in os.environ:
                 self.envs[key] = os.environ[key]
-                needUpdate = True
-        if needUpdate:
-            ConfigManager.set_translator_by_name(self.name, self.envs)
-        if envs is not None:
-            for key in envs:
-                self.envs[key] = envs[key]
-            ConfigManager.set_translator_by_name(self.name, self.envs)
 
     def add_cache_impact_parameters(self, k: str, v):
         """
-        Add parameters that affect the translation quality to distinguish the translation effects under different parameters.
-        :param k: key
-        :param v: value
+        번역 품질에 영향을 미칠 수 있는 추가 파라미터를 캐시에 포함.
         """
         self.cache.add_params(k, v)
 
     def translate(self, text, ignore_cache=False):
         """
-        Translate the text, and the other part should call this method.
-        :param text: text to translate
-        :return: translated text
+        텍스트를 번역. 캐시를 활용하여 중복 번역을 방지.
         """
+        # 캐시를 확인하여 번역 결과 가져오기
         if not (self.ignore_cache or ignore_cache):
             cache = self.cache.get(text)
             if cache is not None:
                 return cache
 
+        # 실제 번역 실행
         translation = self.do_translate(text)
+
+        # 번역 결과를 캐시에 저장
         self.cache.set(text, translation)
         return translation
 
     def do_translate(self, text):
         """
-        Actual translate text, override this method
-        :param text: text to translate
-        :return: translated text
+        실제 번역 작업을 수행. 하위 클래스에서 구현 필요.
         """
-        raise NotImplementedError
+        raise NotImplementedError("do_translate 메서드는 하위 클래스에서 구현해야 합니다.")
 
     def prompt(self, text, prompt):
+        """
+        사용자 정의 프롬프트를 활용하여 번역 요청 생성.
+        """
         if prompt:
             context = {
                 "lang_in": self.lang_in,
@@ -112,7 +99,7 @@ class BaseTranslator:
             return [
                 {
                     "role": "system",
-                    "content": "You are a professional,authentic machine translation engine.",
+                    "content": "You are a professional, authentic machine translation engine.",
                 },
                 {
                     "role": "user",
@@ -122,6 +109,7 @@ class BaseTranslator:
 
     def __str__(self):
         return f"{self.name} {self.lang_in} {self.lang_out} {self.model}"
+
 
 
 class GoogleTranslator(BaseTranslator):
