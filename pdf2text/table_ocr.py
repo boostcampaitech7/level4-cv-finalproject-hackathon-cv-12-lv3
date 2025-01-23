@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-
+from collections import defaultdict
 from PIL import Image
 from utils import select_device
 # from transformers import AutoImageProcessor, AutoModelForObjectDetection
@@ -11,12 +11,12 @@ from fitz import Rect
 
 
 CLASS_NAME2IDX = {
-    'table': 0,
-    'table column': 1,
-    'table row': 2,
-    'table column header': 3,
-    'table projected row header': 4,
-    'table spanning cell': 5,
+    'table': 0,  # 표 전체
+    'table col': 1,  # 열
+    'table row': 2,  # 행
+    'table col header': 3,  # 열 헤더
+    'table projected row header': 4,  # 행 헤더
+    'table extended cell': 5,  # 확장 셀
     'no object': 6,
 }
 
@@ -24,11 +24,11 @@ CLASS_IDX2NAME = {v: k for k, v in CLASS_NAME2IDX.items()}
 
 STRUCTURE_THRESHOLD = {
     "table": 0.5,
-    "table column": 0.5,
+    "table col": 0.5,
     "table row": 0.5,
-    "table column header": 0.5,
+    "table col header": 0.5,
     "table projected row header": 0.5,
-    "table spanning cell": 0.5,
+    "table extended cell": 0.5,
     "no object": 10,
 }
 
@@ -94,8 +94,10 @@ class TableOCR:
             outputs = self.structure_model(
                 image_tensor.unsqueeze(0).to(self.device))
 
+        # model의 결과값에 대한 format 변경
         parsing_outputs = parse_structure_model_outputs(outputs, img.size)
 
+        # 추출한 구성요소로 부터 Table 구조 빌드
         table_structure = build_table_from_objects(parsing_outputs)
 
 
@@ -152,23 +154,25 @@ def build_table_from_objects(objects):
         structure = {}
         # table 내부 객체 간 type에 따른 구분
         cols = [obj for obj in objects_in_table if obj['label']
-                == 'table column']
+                == 'table col']
         rows = [obj for obj in objects_in_table if obj['label'] == 'table row']
 
         # col header를 의미
         col_headers = [
-            obj for obj in objects_in_table if obj['label'] == 'table column header']
+            obj for obj in objects_in_table if obj['label'] == 'table col header']
 
-        # 병합된 셀
+        # 확장된 셀
         extended_cells = [
-            obj for obj in objects_in_table if obj['label'] == 'table spanning cell']
+            obj for obj in objects_in_table if obj['label'] == 'table extended cell']
 
+        # 확장된 셀이라고해서 row header를 의미하는 건 아님
         for obj in extended_cells:
             obj['projected row header'] = False
 
         row_headers = [obj for obj in objects_in_table if obj['label']
                        == 'table projected row header']
 
+        # row header 체크
         for obj in row_headers:
             obj['projected row header'] = True
 
@@ -177,6 +181,7 @@ def build_table_from_objects(objects):
         for obj in rows:
             obj['col header'] = False
             for header_obj in col_headers:
+                # row가 col header와 겹치는지 확인
                 if intersection_ratio_for_b1(obj['bbox'], header_obj['bbox']) >= 0.5:
                     obj['col header'] = True
 
@@ -211,6 +216,13 @@ def build_table_from_objects(objects):
         structure['col headers'] = col_headers
         structure['extended cells'] = extended_cells
 
+        if len(rows) > 0 and len(cols) > 1:
+            structure = refine_table_structure(structure)
+
+        table_structures.append(structure)
+
+    return table_structures
+
 
 def refine_lines(mode, lines, threshold):
     # NOTE: 해당 함수는 부가적인 함수로 따로 빼는게 좋으려나?
@@ -219,28 +231,7 @@ def refine_lines(mode, lines, threshold):
 
     assert mode in ('rows', 'cols')
 
-    lines = sorted(lines, key=lambda x: -x['prob'])
-
-    remove_object = [False] * len(lines)
-
-    # 일정 부분 이상 겹치는 부분 제거
-    for obj1 in range(1, len(lines)):
-        obj1_rect = Rect(lines[obj1]['bbox'])
-        obj1_area = obj1_rect.get_area()
-
-        if obj1_area <= 0 or remove_object[obj1]:
-            continue
-
-        for obj2 in range(obj1):
-            obj2_rect = Rect(lines[obj2]['bbox'])
-            inter = obj1_rect.intersect(obj2_rect).get_area()
-
-            score = inter / obj1_area
-
-            if score >= threshold:
-                remove_object[obj1] = True
-                break
-    lines = [obj for idx, obj in enumerate(lines) if not remove_object[idx]]
+    lines = nms(lines, threshold)
 
     if len(lines) == 1:
         return lines
@@ -251,6 +242,34 @@ def refine_lines(mode, lines, threshold):
     return sorted(lines, key=lambda x: x['bbox'][axis_range[0]] + x['bbox'][axis_range[1]])
 
 
+def nms(objects, threshold):
+    # NOTE: 해당 함수는 부가적인 함수로 따로 빼는게 좋으려나?
+    if len(objects):
+        return []
+
+    objects = sorted(objects, key=lambda x: -x['prob'])
+    remove_object = [False] * len(objects)
+
+    # 일정 부분 이상 겹치는 부분 제거
+    for obj1 in range(1, len(objects)):
+        obj1_rect = Rect(objects[obj1]['bbox'])
+        obj1_area = obj1_rect.get_area()
+
+        if obj1_area <= 0 or remove_object[obj1]:
+            continue
+
+        for obj2 in range(obj1):
+            obj2_rect = Rect(objects[obj2]['bbox'])
+            inter = obj1_rect.intersect(obj2_rect).get_area()
+
+            score = inter / obj1_area
+
+            if score >= threshold:
+                remove_object[obj1] = True
+                break
+    return [obj for idx, obj in enumerate(objects) if not remove_object[idx]]
+
+
 def align_lines(mode, lines, standard):
     assert mode in ('rows', 'cols')
 
@@ -259,3 +278,288 @@ def align_lines(mode, lines, standard):
         line['bbox'][axis_range[0]] = standard[axis_range[0]]
         line['bbox'][axis_range[1]] = standard[axis_range[1]]
     return lines
+
+
+def align_headers(headers, rows):
+    # 테이블의 최상단 열 헤더를 정의하는 함수
+    for row in rows:
+        row['col header'] = False
+
+    overlap_row_indices = []
+    # header와 row가 겹치는지를 확인
+    for header in headers:
+        for idx, row in enumerate(rows):
+            row_height = row['bbox'][3] - row['bbox'][1]  # ymax - ymin
+            min_row_overlap = max(row['bbox'][1], header['bbox'][1])
+            max_row_overlap = min(row['bbox'][3], header['bbox'][3])
+            overlap_height = max_row_overlap - min_row_overlap
+            if overlap_height / row_height >= 0.5:
+                overlap_row_indices.append(idx)
+
+    # 겹치는게 없으면 빈 리스트 반환
+    if len(overlap_row_indices) == 0:
+        return []
+
+    # 첫 번째 헤더와 관련된 row가 0보다 크면, 이전 행도 포함하도록 변경
+    if overlap_row_indices[0] > 0:
+        overlap_row_indices = list(
+            range(overlap_row_indices[0] + 1)) + overlap_row_indices
+
+    header_rect = Rect()
+    last_row_idx = -1
+    for row_idx in overlap_row_indices:
+        if row_idx == last_row_idx + 1:  # 연속되는 Row만 처리
+            row = rows[row_idx]
+            row['col header'] = True
+            header_rect = header_rect.include_rect(row['bbox'])
+            last_row_idx = row_idx
+        else:  # 연속하지 않으면 헤더가 아님
+            break
+
+    header = {'bbox': list(header_rect)}  # bbox 좌표
+
+    return [header]
+
+
+def align_extended_cells(cells, rows, cols):
+    # 확장된 셀의 경계를 row, col에 맞게 정렬
+    # 확장된 셀이 row와 col과의 경계가 절반이상 겹치지 않으면 제거한다.
+    aligned_cells = []
+
+    for cell in cells:
+        cell['header'] = False  # 헤더와 관련있는지 판단 여부
+        row_rect = None
+        col_rect = None
+        overlap_row_with_header = set()
+        overlap_row_with_data = set()
+
+        for idx, row in enumerate(rows):
+            # row와 cell간의 겹치는지 판단 -> 높이로 판단
+            row_height = row['bbox'][3] - row['bbox'][1]
+            cell_height = cell['bbox'][3] - cell['bbox'][1]
+
+            min_row_overlap = max(row['bbox'][1], cell['bbox'][1])
+            max_row_overlap = min(row['bbox'][3], cell['bbox'][3])
+            overlap_height = max_row_overlap - min_row_overlap
+
+            if 'span' in cell:
+                overlap_fraction = max(overlap_height/row_height,
+                                       overlap_height/cell_height)
+            else:
+                overlap_fraction = overlap_height / row_height
+
+            if overlap_fraction >= 0.5:
+                if 'header' in row and row['header']:
+                    overlap_row_with_header.add(idx)
+                else:
+                    overlap_row_with_data.add(idx)
+
+        cell['header'] = False
+        # data와 헤더 둘다 겹치면 더 적은 그룹 제거
+        if len(overlap_row_with_data) > 0 and len(overlap_row_with_header) > 0:
+            if len(overlap_row_with_data) > len(overlap_row_with_header):
+                overlap_row_with_header = set()
+            else:
+                overlap_row_with_data = set()
+
+        # header만 겹치면 cell은 header로 표시
+        if len(overlap_row_with_header) > 0:
+            cell['header'] = True
+        elif 'span' in cell:
+            continue
+
+        # 겹치는 행 영역 계산
+        overlap_rows = overlap_row_with_data.union(
+            overlap_row_with_header)
+
+        for idx in overlap_rows:
+            if row_rect is None:
+                row_rect = Rect(rows[idx]['bbox'])
+            else:
+                row_rect = row_rect.include_rect(rows[idx]['bbox'])
+
+        if row_rect is None:
+            continue
+
+        overlap_cols = []
+        for col_num, col in enumerate(cols):  # 너비로 판단
+            col_width = col['bbox'][2] - col['bbox'][0]
+            cell_width = cell['bbox'][2] - cell['bbox'][0]
+
+            min_col_overlap = max(col['bbox'][0], cell['bbox'][0])
+            max_col_overlap = min(col['bbox'][2], cell['bbox'][2])
+            overlap_width = max_col_overlap - min_col_overlap
+
+            if 'span' in cell:
+                overlap_fraction = max(overlap_width/col_width,
+                                       overlap_width/cell_width)
+                if cell['header']:
+                    overlap_fraction = overlap_fraction * 2
+            else:
+                overlap_fraction = overlap_width / col_width
+
+            if overlap_fraction >= 0.5:
+                overlap_cols.append(col_num)
+
+                if col_rect is None:
+                    col_rect = Rect(col['bbox'])
+                else:
+                    col_rect = col_rect.include_rect(col['bbox'])
+
+        if col_rect is None:
+            continue
+
+        cell_bbox = list(row_rect.intersect(col_rect))
+        cell['bbox'] = cell_bbox
+
+        # 하나 이상의 row, col을 포함하면 해당 cell은 정렬된 것으로 판단
+        if (len(overlap_rows) > 0 and len(overlap_cols) > 0
+                and (len(overlap_rows) > 1 or len(overlap_cols) > 1)):
+            cell['row_numbers'] = list(overlap_rows)
+            cell['col_numbers'] = overlap_cols
+            aligned_cells.append(cell)
+
+            # 현재 처리하려는 pipeline에서는 'span'이라는 속성이 없는 것으로 판단
+            if 'span' in cell and cell['header'] and len(cell['col_numbers']) > 1:
+                for row_idx in range(0, min(cell['row_numbers'])):
+                    new_cell = {'row_numbers': [row_idx], 'col_numbers': cell['col_numbers'],
+                                'prob': cell['prob'], 'propagated': True}
+                    new_cell_cols = [cols[idx]
+                                     for idx in cell['col_numbers']]
+                    new_cell_rows = [rows[idx] for idx in cell['row_numbers']]
+
+                    # cell의 bbox 업데이트
+                    bbox = [min([col['bbox'][0] for col in new_cell_cols]),
+                            min([row['bbox'][1] for row in new_cell_rows]),
+                            max([col['bbox'][2]
+                                for col in new_cell_cols]),
+                            max([row['bbox'][3] for row in new_cell_rows])]
+
+                    new_cell['bbox'] = bbox
+                    aligned_cells.append(new_cell)
+
+    return aligned_cells
+
+
+def nms_extended_cells(cells):
+    # 확장된 셀들이 같은 셀에 겹치면 낮은 확률을 가진 확장 셀의 크기를 줄인다.
+    cells = sorted(cells, key=lambda x: -x['prob'])
+    remove_cells = [False] * len(cells)
+
+    for cell_num1 in range(1, len(cells)):
+        cell_obj1 = cells[cell_num1]
+        for cell_num2 in range(cell_num1):
+            cell_obj2 = cells[cell_num2]
+            remove_extended_cell_overlap(cell_obj1, cell_obj2)
+
+        if ((len(cell_obj1['row_numbers']) < 2 and len(cell_obj1['col_numbers']) < 2)
+                or len(cell_obj1['row_numbers']) == 0 or len(cell_obj1['col_numbers']) == 0):
+            remove_cells[cell_num1] = True
+
+    return [obj for idx, obj in enumerate(cells) if not remove_cells[idx]]
+
+
+def remove_extended_cell_overlap(cell_obj1, cell_obj2):
+    # 확장된 셀간의 중복을 해결한다.
+    # 중복된 셀간의 prob를 비교하여 더 낮은 셀에서 row or col을 제거함으로써 해결
+    common_rows = set(cell_obj2['row_numbers']).intersection(
+        set(cell_obj1['row_numbers']))
+    common_cols = set(cell_obj2['col_numbers']).intersection(
+        set(cell_obj1['col_numbers']))
+
+    while len(common_rows) > 0 and len(common_cols) > 0:
+        if len(cell_obj1['row_numbers']) < len(cell_obj1['col_numbers']):
+            min_col = min(cell_obj1['col_numbers'])
+            max_col = max(cell_obj1['col_numbers'])
+
+            if max_col in common_cols:
+                common_cols.remove(max_col)
+                cell_obj1['col_numbers'].remove(max_col)
+            elif min_col in common_cols:
+                common_cols.remove(min_col)
+                cell_obj1['col_numbers'].remove(min_col)
+            else:
+                cell_obj1['col_numbers'] = []
+                common_cols = set()
+        else:
+            min_row = min(cell_obj1['row_numbers'])
+            max_row = max(cell_obj1['row_numbers'])
+
+            if max_row in common_rows:
+                common_rows.remove(max_row)
+                cell_obj1['row_numbers'].remove(max_row)
+            elif min_row in common_rows:
+                common_rows.remove(min_row)
+                cell_obj1['row_numbers'].remove(min_row)
+            else:
+                cell_obj1['row_numbers'] = []
+                common_rows = set()
+
+
+def header_extended_cell_tree(cells):
+    # Header 속성을 가진 확장셀 추출
+    header_cells = [
+        cell for cell in cells if 'header' in cell and cell['header']]
+    header_cells = sorted(header_cells, key=lambda x: -x['prob'])
+
+    for header_cell in header_cells[:]:
+        ancestors_by_row = defaultdict(int)
+        min_row = min(header_cell['row_numbers'])
+
+        for header_cell2 in header_cells:
+            max_row2 = max(header_cell2['row_numbers'])
+
+            if max_row2 < min_row:
+                if (set(header_cell['col_numbers']).issubset(
+                        set(header_cell2['col_numbers']))):
+                    for row2 in header_cell2['row_numbers']:
+                        ancestors_by_row[row2] += 1
+
+        for row in range(min_row):
+            if not ancestors_by_row[row] == 1:
+                cells.remove(header_cell)
+                break
+
+
+def refine_table_structure(structure):
+    # 테이블 구조 후처리 과정
+    rows, cols = structure['rows'], structure['cols']
+
+    col_headers = structure['col headers']
+    # col header를 일정 Threshold 이상만 남긴다.
+    col_headers = [obj for obj in col_headers
+                   if obj['prob'] >= STRUCTURE_THRESHOLD['table col header']]
+
+    col_headers = nms(col_headers, 0.05)
+    col_headers = align_headers(col_headers, rows)
+
+    # 확장된 셀 처리, True면 row header임
+    extended_cells = [cell for cell in structure['extended cells']
+                      if not cell['projected row header']]
+
+    # row_headers 추출
+    projected_row_headers = [cell for cell in structure['extended cells']
+                             if cell['projected row header']]
+
+    extended_cells = [obj for obj in extended_cells
+                      if obj['prob'] >= STRUCTURE_THRESHOLD['table extended cell']]
+
+    projected_row_headers = [obj for obj in projected_row_headers
+                             if obj['prob'] >= STRUCTURE_THRESHOLD['table projected row header']]
+
+    extended_cells.extend(projected_row_headers)
+
+    # NMS 작업 전 정렬을 통해 NMS 작업의 정확도를 향상시킨다.
+    extended_cells = align_extended_cells(extended_cells, rows, cols)
+
+    # NMS 작업 진행
+    extended_cells = nms_extended_cells(extended_cells)
+
+    header_extended_cell_tree(extended_cells)
+
+    structure['cols'] = cols
+    structure['rows'] = rows
+    structure['extended cells'] = extended_cells
+    structure['col headers'] = col_headers
+
+    return structure
