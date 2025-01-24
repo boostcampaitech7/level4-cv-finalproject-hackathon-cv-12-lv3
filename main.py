@@ -58,7 +58,7 @@ if __name__ == '__main__':
                     "page": int(i + 1),
                     "chunk": chunk
                 })
-
+                
         for i in tqdm(chunked_documents, desc="Generating Embeddings", total=len(chunked_documents)):
             # embedding = embedding_api.get_embedding(i["chunk"])
             #  i["embedding"] = embedding
@@ -82,7 +82,7 @@ if __name__ == '__main__':
 
         # 5. 문서 업로드
         uploader = DocumentUploader(conn)
-        uploader.upload_documents(chunked_documents)
+        uploader.upload_documents(chunked_documents, session_id)
         
         print("문서 업로드가 완료되었습니다.")
 
@@ -122,6 +122,7 @@ if __name__ == '__main__':
                 session_id=session_id,
                 top_k=5
             )
+            print(relevant_response)
             request_data = multichat.prepare_chat_request(user_input, context=relevant_response)
 
             try:
