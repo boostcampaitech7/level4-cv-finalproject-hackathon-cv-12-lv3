@@ -29,17 +29,23 @@ class Formula_Detect :
         return img
 
     # Detection을 수행하는 함수. (threshold로 임계값 설정 test필요.)
-    def detect(self, img, conf_thres = 0.4, iou_thres = 0.4) :
+    def detect(self, img, conf_thres=0.3, iou_thres=0.3):
+        # Store original image shape
+        original_shape = img.shape[:2]  # (height, width)
+
+        # Preprocess the image
         img = self.prepare_img(img)
-        
-        with torch.no_grad() :
+
+        with torch.no_grad():
             pred = self.model(img)[0]
         pred = non_max_suppression(pred, conf_thres=conf_thres, iou_thres=iou_thres)
 
-        # 결과를 [bbox, label, confidence] 형태로 변환
         results = []
         for det in pred:
             if det is not None and len(det):
+                # Rescale boxes to original image dimensions
+                det[:, :4] = scale_coords(img.shape[2:], det[:, :4], original_shape).round()
+
                 for *bbox, conf, cls in det:
                     bbox = [int(coord) for coord in bbox]
                     label = int(cls)
