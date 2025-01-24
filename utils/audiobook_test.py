@@ -4,7 +4,7 @@ import urllib.parse
 import sys
 import os
 sys.path.insert(0, os.path.abspath('/Users/haneol/Documents/Coding/level4-cv-finalproject-hackathon-cv-12-lv3/'))
-from config.config import API_CONFIG
+from config.config import VOICE_CONFIG
 
 import io
 import requests
@@ -75,7 +75,7 @@ class ClovaTTSAPI:
 
 def synthesize_text(text, type="speaker1"):
     """Synthesizes speech from the input string of text using Naver Clova API."""
-    clova_api = ClovaTTSAPI(API_CONFIG["voice_client_id"], API_CONFIG["voice_client_secret"])
+    clova_api = ClovaTTSAPI(VOICE_CONFIG["voice_client_id"], VOICE_CONFIG["voice_client_secret"])
     if type == "speaker1":
         speaker = "jinho"
     else:
