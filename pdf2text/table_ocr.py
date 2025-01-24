@@ -95,13 +95,18 @@ class TableOCR:
                 image_tensor.unsqueeze(0).to(self.device))
 
         # model의 결과값에 대한 format 변경
-        parsing_outputs = parse_structure_model_outputs(outputs, img.size)
+        postprocess_objects = process_and_label_objects(outputs, img.size)
 
-        # 추출한 구성요소로 부터 Table 구조 빌드
-        table_structure = build_table_from_objects(parsing_outputs)
+        # 추출한 구성요소로 부터 일관된 Table 구조 빌드
+        tables_structure = extract_structure_from_objects(postprocess_objects)
+
+        # 구성된 구조를 바탕으로 각 셀을 정의하고, 위치를 최적화하여 일관된 셀을 생성
+        tables_cells = [
+            extract_cells_from_structure(table) for table in tables_structure
+        ]
 
 
-def parse_structure_model_outputs(outputs, table_size):
+def process_and_label_objects(outputs, table_size):
     # outputs의 label 추출, (values, indices)
     outputs_info = outputs['logits'].softmax(-1).max(-1)
 
@@ -140,7 +145,7 @@ def intersection_ratio_for_b1(b1, b2):
     return Rect(b1).intersect(b2).get_area() / b1_area if b1_area > 0 else 0
 
 
-def build_table_from_objects(objects):
+def extract_structure_from_objects(objects):
     # 각 테이블 객체가 테이블 전체를 나타내는 박스를 가짐.
     tables = [ele for ele in objects if ele['label'] == 'table']
     table_structures = []
@@ -153,8 +158,7 @@ def build_table_from_objects(objects):
 
         structure = {}
         # table 내부 객체 간 type에 따른 구분
-        cols = [obj for obj in objects_in_table if obj['label']
-                == 'table col']
+        cols = [obj for obj in objects_in_table if obj['label'] == 'table col']
         rows = [obj for obj in objects_in_table if obj['label'] == 'table row']
 
         # col header를 의미
@@ -169,8 +173,8 @@ def build_table_from_objects(objects):
         for obj in extended_cells:
             obj['projected row header'] = False
 
-        row_headers = [obj for obj in objects_in_table if obj['label']
-                       == 'table projected row header']
+        row_headers = [obj for obj in objects_in_table
+                       if obj['label'] == 'table projected row header']
 
         # row header 체크
         for obj in row_headers:
@@ -244,28 +248,28 @@ def refine_lines(mode, lines, threshold):
 
 def nms(objects, threshold):
     # NOTE: 해당 함수는 부가적인 함수로 따로 빼는게 좋으려나?
-    if len(objects):
+    if len(objects) == 0:
         return []
 
     objects = sorted(objects, key=lambda x: -x['prob'])
     remove_object = [False] * len(objects)
 
     # 일정 부분 이상 겹치는 부분 제거
-    for obj1 in range(1, len(objects)):
-        obj1_rect = Rect(objects[obj1]['bbox'])
+    for obj1_idx in range(1, len(objects)):
+        obj1_rect = Rect(objects[obj1_idx]['bbox'])
         obj1_area = obj1_rect.get_area()
 
-        if obj1_area <= 0 or remove_object[obj1]:
+        if obj1_area <= 0 or remove_object[obj1_idx]:
             continue
 
-        for obj2 in range(obj1):
+        for obj2 in range(obj1_idx):
             obj2_rect = Rect(objects[obj2]['bbox'])
             inter = obj1_rect.intersect(obj2_rect).get_area()
 
             score = inter / obj1_area
 
             if score >= threshold:
-                remove_object[obj1] = True
+                remove_object[obj1_idx] = True
                 break
     return [obj for idx, obj in enumerate(objects) if not remove_object[idx]]
 
@@ -563,3 +567,172 @@ def refine_table_structure(structure):
     structure['col headers'] = col_headers
 
     return structure
+
+
+def extract_cells_from_structure(table_structure):
+    "테이블 구조를 셀로 변환하고, 헤더 / 데이터 셀로 분류하는 기능"
+    cols = table_structure['cols']
+    rows = table_structure['rows']
+    extended_cells = table_structure['extended cells']
+    cells = []
+    subcells = []
+
+    for col_idx, col in enumerate(cols):
+        for row_idx, row in enumerate(rows):
+            # row, col의 교차점을 이용하여 cell 구성
+            col_rect = Rect(list(col['bbox']))
+            row_rect = Rect(list(row['bbox']))
+            cell_rect = row_rect.intersect(col_rect)
+            header = 'col header' in row and row['col header']
+            cell = {
+                'bbox': list(cell_rect),
+                'col_indices': [col_idx],
+                'row_indices': [row_idx],
+                'col header': header,
+            }
+
+            # cell이 다른 확장 셀과 겹치는 지 확인, 겹치는 비율이 50% 초과면 서브셀로 분류
+            cell['subcell'] = False
+            for extended_cell in extended_cells:
+                extended_cell_rect = Rect(list(extended_cell['bbox']))
+                if (extended_cell_rect.intersect(cell_rect).get_area() / cell_rect.get_area()) > 0.5:
+                    cell['subcell'] = True
+                    break
+
+            if cell['subcell']:
+                subcells.append(cell)
+            else:  # 서브셀이 아니면 일반 셀로 저장
+                cell['projected row header'] = False
+                cells.append(cell)
+
+    # 확장 셀 처리
+    for extended_cell in extended_cells:
+        extended_cell_rect = Rect(list(extended_cell['bbox']))
+        cell_cols = set()
+        cell_rows = set()
+        cell_rect = None
+        header = True
+
+        for subcell in subcells:
+            subcell_rect = Rect(list(subcell['bbox']))
+            subcell_rect_area = subcell_rect.get_area()
+
+            # 겹치는 부분이 50% 이상이면 포함시킨다.
+            if (subcell_rect.intersect(extended_cell_rect).get_area() / subcell_rect_area) > 0.5:
+                if cell_rect is None:
+                    cell_rect = Rect(list(subcell['bbox']))
+                else:
+                    cell_rect.include_rect(Rect(list(subcell['bbox'])))
+
+                # 포함한 subcell의 row와 col을 저장
+                cell_rows = cell_rows.union(set(subcell['row_indices']))
+                cell_cols = cell_cols.union(set(subcell['col_indices']))
+
+                header = header and 'col header' in subcell and subcell['col header']
+
+        # subcell의 row와 col이 저장되어 있다면, 새로운 셀을 만들어 추가
+        if len(cell_rows) > 0 and len(cell_cols) > 0:
+            cell = {
+                'bbox': list(cell_rect),
+                'col_indices': list(cell_cols),
+                'row_indices': list(cell_rows),
+                'col header': header,
+                'projected row header': extended_cell['projected row header'],
+            }
+            cells.append(cell)
+
+    # tokens이 없으므로 빈 배열 반환
+    # _, _, cell_match_scores = slot_into_containers(cells, tokens)
+    cell_match_scores = []
+    try:
+        mean_match_score = sum(cell_match_scores) / len(cell_match_scores)
+        min_match_score = min(cell_match_scores)
+        confidence_score = (mean_match_score + min_match_score) / 2
+    except:
+        confidence_score = 0
+
+    # 최종 추출전 row, col 확장
+    dilated_cols = cols
+    dilated_rows = rows
+    for cell in cells:
+        col_rect = Rect()
+        for col_idx in cell['col_indices']:
+            col_rect.include_rect(list(dilated_cols[col_idx]['bbox']))
+
+        row_rect = Rect()
+        for row_idx in cell['col_indices']:
+            row_rect.include_rect(list(dilated_rows[row_idx]['bbox']))
+
+        # 최종 bbox 조정
+        cell_rect = col_rect.intersect(row_rect)
+        cell['bbox'] = list(cell_rect)
+
+    # span_nums_by_cell, _, _ = slot_into_containers(
+    #     cells,
+    #     tokens,
+    #     overlap_threshold=0.001,
+    #     unique_assignment=True,
+    #     forced_assignment=False,
+    # )
+    span_nums_by_cell = [[] for _ in range(len(cells))]
+
+    for cell, cell_span_nums in zip(cells, span_nums_by_cell):
+        # cell_spans = [tokens[num] for num in cell_span_nums]
+        # cell['cell text'] = extract_text_from_spans(
+        #     cell_spans, remove_integer_superscripts=False
+        # )
+        cell['spans'] = ""
+
+    rows = sorted(rows, key=lambda x: x['bbox'][0] + x['bbox'][2])
+    cols = sorted(cols, key=lambda x: x['bbox'][1] + x['bbox'][3])
+
+    min_y_values_by_row = defaultdict(list)
+    max_y_values_by_row = defaultdict(list)
+    min_x_values_by_col = defaultdict(list)
+    max_x_values_by_col = defaultdict(list)
+
+    for cell in cells:
+        min_row = min(cell["row_indices"])
+        max_row = max(cell["row_indices"])
+        min_col = min(cell["col_indices"])
+        max_col = max(cell["col_indices"])
+
+        for span in cell['spans']:
+            min_x_values_by_col[min_col].append(span['bbox'][0])
+            min_y_values_by_row[min_row].append(span['bbox'][1])
+            max_x_values_by_col[max_col].append(span['bbox'][2])
+            max_y_values_by_row[max_row].append(span['bbox'][3])
+
+    for row_idx, row in enumerate(rows):
+        if len(min_x_values_by_col[0]) > 0:
+            row['bbox'][0] = min(min_x_values_by_col[0])
+        if len(min_y_values_by_row[row_idx]) > 0:
+            row['bbox'][1] = min(min_y_values_by_row[row_idx])
+        if len(max_x_values_by_col[len(cols) - 1]) > 0:
+            row['bbox'][2] = max(max_x_values_by_col[len(cols) - 1])
+        if len(max_y_values_by_row[row_idx]) > 0:
+            row['bbox'][3] = max(max_y_values_by_row[row_idx])
+
+    for col_idx, col in enumerate(cols):
+        if len(min_x_values_by_col[col_idx]) > 0:
+            col['bbox'][0] = min(min_x_values_by_col[col_idx])
+        if len(min_y_values_by_row[0]) > 0:
+            col['bbox'][1] = min(min_y_values_by_row[0])
+        if len(max_x_values_by_col[col_idx]) > 0:
+            col['bbox'][2] = max(max_x_values_by_col[col_idx])
+        if len(max_y_values_by_row[len(rows) - 1]) > 0:
+            col['bbox'][3] = max(max_y_values_by_row[len(rows) - 1])
+
+    for cell in cells:
+        row_rect = Rect()
+        column_rect = Rect()
+        for row_idx in cell['row_indices']:
+            row_rect.include_rect(list(rows[row_idx]['bbox']))
+        for col_idx in cell['col_indices']:
+            column_rect.include_rect(list(cols[col_idx]['bbox']))
+        cell_rect = row_rect.intersect(column_rect)
+        if cell_rect.get_area() > 0:
+            cell['bbox'] = list(cell_rect)
+            pass
+
+    return cells, confidence_score
