@@ -1,5 +1,6 @@
 import fitz
 import io
+import torch
 from PIL import Image
 from api import OCRAPIExecutor
 
@@ -35,3 +36,13 @@ def images_to_text(image, ocr_host, ocr_secret_key):
     text = " ".join([field['inferText']
                     for field in ocr_result['images'][0]['fields']])
     return text
+
+
+def select_device(device):
+    if device is not None:
+        return device
+
+    device = 'cpu'
+    if torch.cuda.is_available():
+        device = 'cuda'
+    return device
