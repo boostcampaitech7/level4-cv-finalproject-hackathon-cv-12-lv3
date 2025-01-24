@@ -1,6 +1,5 @@
 import torch
 import numpy as np
-import re
 
 from fitz import Rect
 from PIL import Image
@@ -10,8 +9,8 @@ from torchvision import transforms
 from collections import defaultdict
 from transformers import TableTransformerForObjectDetection
 
-import pdf2text.table_utils as table_utils
-from pdf2text.text_ocr import TextOCR
+from . import table_utils
+from .text_ocr import TextOCR
 
 CLASS_NAME2IDX = {
     'table': 0,  # 표 전체
