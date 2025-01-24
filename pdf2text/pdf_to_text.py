@@ -1,6 +1,5 @@
 from PIL import Image
 
-from utils import select_device
 from pathlib import Path
 
 from .text_ocr import TextOCR
@@ -8,6 +7,8 @@ from .table_ocr import TableOCR
 from .formula_ocr import FormulaOCR
 from .formula_detect import Formula_Detect
 from .layout_analysis import LayoutAnalyzer, ElementType
+
+from .pdf2text_utils import select_device
 
 
 class Pdf2Text(object):

@@ -1,10 +1,11 @@
 import cv2
 import torch
 import numpy as np
+import torchvision
 
 from PIL import Image
 from enum import Enum
-from utils import select_device
+from .pdf2text_utils import select_device
 from doclayout_yolo import YOLOv10
 
 
@@ -73,9 +74,22 @@ class LayoutAnalyzer:
             conf=confidence,
             device=self.device)[0]
 
-        scores = det_res.__dict__["boxes"].conf
+        probs = det_res.__dict__["boxes"].conf
         boxes = det_res.__dict__["boxes"].xyxy
         _classes = det_res.__dict__["boxes"].cls
+
+        indices = torchvision.ops.nms(
+            boxes=torch.Tensor(boxes),
+            scores=torch.Tensor(probs),
+            iou_threshold=iou_threshold
+        )
+
+        boxes, probs, _classes = boxes[indices], probs[indices], _classes[indices]
+        _classes = _classes.int().tolist()
+
+        layout_result = []
+        for box, prob, _cls in zip(boxes, probs, _classes):
+            layout_result.append()
 
     def _prepare_img(self, image, reshape_size, stride=32):
         if isinstance(image, Image.Image):

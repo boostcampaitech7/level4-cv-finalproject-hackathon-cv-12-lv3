@@ -9,3 +9,5 @@ __pycache__/
 *.log
 *.tmp
 *.pdf
+*.jpg
+*.png

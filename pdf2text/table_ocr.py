@@ -4,13 +4,13 @@ import numpy as np
 from fitz import Rect
 from PIL import Image
 from itertools import chain
-from utils import select_device
 from torchvision import transforms
 from collections import defaultdict
 from transformers import TableTransformerForObjectDetection
 
 from . import table_utils
 from .text_ocr import TextOCR
+from .pdf2text_utils import select_device
 
 CLASS_NAME2IDX = {
     'table': 0,  # 표 전체
