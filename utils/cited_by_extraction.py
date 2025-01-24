@@ -6,7 +6,12 @@ import sys
 sys.path.insert(0, os.path.abspath('/Users/haneol/Documents/Coding/level4-cv-finalproject-hackathon-cv-12-lv3/'))
 from config.config import GOOGLE_SCHOLAR_API_KEY
 
-def get_cited_by_papers(query, api_key, topk=5):
+def get_cited_by_papers(query, topk=5):
+    api_key = GOOGLE_SCHOLAR_API_KEY  # SearchApi API 키 설정
+    if not api_key:
+        print("SEARCHAPI_API_KEY environment variable not set.")
+        exit()
+
     url = "https://www.searchapi.io/api/v1/search"
     # 1. 논문 고유 ID를 검색하는 최초 쿼리
     params = {
@@ -60,14 +65,9 @@ def get_cited_by_papers(query, api_key, topk=5):
         return None
 
 if __name__ == "__main__":
-    api_key = GOOGLE_SCHOLAR_API_KEY  # SearchApi API 키 설정
-    if not api_key:
-        print("SEARCHAPI_API_KEY environment variable not set.")
-        exit()
-
     target_paper_query = "Attention is all you need"  # 타겟 논문 검색어
 
-    cited_by_papers = get_cited_by_papers(target_paper_query, api_key)
+    cited_by_papers = get_cited_by_papers(target_paper_query)
 
     if cited_by_papers:
         print("\n타겟 논문을 인용한 논문 상위 5개:")
