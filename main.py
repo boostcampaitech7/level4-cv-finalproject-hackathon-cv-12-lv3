@@ -5,6 +5,7 @@ from utils import llm_refine, query_and_respond_reranker_compare
 from api import EmbeddingAPI, ChatCompletionsExecutor, SummarizationExecutor
 from datebase import DatabaseConnection, DocumentUploader, SessionManager, PaperManager, ChatHistoryManager
 from sentence_transformers import SentenceTransformer, CrossEncoder
+from hashlib import sha256
 
 if __name__ == '__main__':
 
@@ -87,7 +88,7 @@ if __name__ == '__main__':
         print("문서 업로드가 완료되었습니다.")
 
         # 6. 멀티챗 매니저 초기화
-        chat_manager = ChatHistoryManager(conn)
+        chat_manager = ChatHistoryManager(conn, embedding_api, completion_executor)
         multichat = MultiChatManager()
 
         # 7. 시스템 메시지 설정
@@ -96,8 +97,9 @@ if __name__ == '__main__':
 
         # 8. 대화 루프
         while True:
+            context = ""
             user_input = input("사용자: ")
-            if user_input.lower() in ['exit', 'quit', '대화종료']:
+            if user_input.lower().replace(" ", "") in ['exit', 'quit', '대화종료']:
                 break
             
             # 8-1. 질의를 강화하기
@@ -120,8 +122,42 @@ if __name__ == '__main__':
                 conn=conn,
                 model=model,
                 session_id=session_id,
-                top_k=5
+                top_k=5,
+                chat_manager=chat_manager
             )
+
+            context_result = chat_manager.handle_question(user_input, session_id)
+
+            if relevant_response['type'] == "reference":
+                context = {
+                    "type": relevant_response['type'],
+                    "content": f"{context_result['content']}\n{relevant_response['content']}" if
+                    context_result else relevant_response['content']
+                }
+            elif relevant_response['type'] in ["unrelated", "no_result"]:
+                context = {
+                    "type": relevant_response['type'],
+                    "content": relevant_response['message']
+                }
+            else:
+                context = {
+                    "type": relevant_response['type'],
+                    "content": relevant_response['message']
+                }
+
+            cache_key = f"{session_id}:{user_input}:{sha256(context['content'].encode()).hexdigest()}"
+
+            if cache_key in chat_manager.cache:
+                cached_response = chat_manager.cache[cache_key]
+                request_data = multichat.prepare_chat_request(
+                    user_input,
+                    context=f"캐시된 응답:\n{cached_response}"
+                )
+            else:
+                request_data = multichat.prepare_chat_request(
+                    user_input,
+                    context=context
+                )
             print(relevant_response)
             request_data = multichat.prepare_chat_request(user_input, context=relevant_response)
 
@@ -132,13 +168,17 @@ if __name__ == '__main__':
                     # 응답 처리
                     multichat.process_response(response)
 
+                    current_embedding = embedding_api.get_embedding(user_input)
+
                     # DB에 대화 저장
                     chat_manager.store_conversation(
                         session_id=session_id,
                         user_message=user_input,
-                        llm_response=response['content']
+                        llm_response=response['content'],
+                        embedding=current_embedding,
+                        chat_type=context['type']
                     )
-                    
+
                     # 토큰 제한 체크
                     if multichat.check_token_limit(request_data["maxTokens"]):
                         print("토큰 제한 도달. 요약을 시작합니다.")
@@ -157,8 +197,11 @@ if __name__ == '__main__':
                             summarized_chat_ids=[msg["chat_id"] for msg in
                                                 multichat.session_state["chat_log"]]
                         )
+
+                        chat_manager.add_to_cache(session_id, user_input, context, summary_text)
                     else:
-                        print(f"\nAI: {response['content']}\n")
+                        print(f"\nAI: {response['content']}")
+                        chat_manager.add_to_cache(session_id, user_input, context, response['content'])
 
                     multichat.initialize_chat("")
 
