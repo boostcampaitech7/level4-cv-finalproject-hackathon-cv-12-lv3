@@ -10,7 +10,7 @@ from transformers import TableTransformerForObjectDetection
 
 from . import table_utils
 from .text_ocr import TextOCR
-from .pdf2text_utils import select_device
+from .pdf2text_utils import select_device, check_box_area, list2box, box2list, sort_boxes, merge_line_texts
 
 CLASS_NAME2IDX = {
     'table': 0,  # 표 전체
@@ -119,7 +119,7 @@ class TableOCR:
             new_box_info = np.array([[xmin, ymin], [xmax, ymin],
                                      [xmax, ymax], [xmin, ymax]])
 
-            if not table_utils.check_box_area(new_box_info, min_h=8, min_w=2):
+            if not check_box_area(new_box_info, min_h=8, min_w=2):
                 continue
             box_infos.append({'position': new_box_info})
 
@@ -131,23 +131,23 @@ class TableOCR:
                 _pos = box_info['position']
                 # xmin, ymin, xmax, ymax
                 text_box = [_pos[0][0], _pos[0][1], _pos[2][0], _pos[2][1]]
-                inner_box = table_utils.list2box(*cut_bbox(cell_box, text_box))
-                if table_utils.check_box_area(inner_box, min_h=8, min_w=2):
+                inner_box = list2box(*cut_bbox(cell_box, text_box))
+                if check_box_area(inner_box, min_h=8, min_w=2):
                     inner_text_boxes.append({'position':  inner_box})
 
             if inner_text_boxes:
                 for box_info in inner_text_boxes:
-                    box = table_utils.box2list(box_info['position'])
+                    box = box2list(box_info['position'])
                     ocr_res = self.text_ocr_model.recognize_only(
                         np.array(image.crop(box)))
 
                     box_info['text'] = ocr_res[0][0][0]
                     box_info['type'] = 'text'
 
-                outs = table_utils.sort_boxes(inner_text_boxes, key='position')
+                outs = sort_boxes(inner_text_boxes, key='position')
                 cell['text_bboxes'] = outs
                 outs = list(chain(*outs))
-                cell['cell text'] = table_utils.merge_line_texts(
+                cell['cell text'] = merge_line_texts(
                     outs,
                     auto_line_break=True,
                     line_sep=' ',

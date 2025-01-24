@@ -5,8 +5,8 @@ import torchvision
 
 from PIL import Image
 from enum import Enum
-from .pdf2text_utils import select_device
 from doclayout_yolo import YOLOv10
+from .pdf2text_utils import select_device
 
 
 class ElementType(Enum):
