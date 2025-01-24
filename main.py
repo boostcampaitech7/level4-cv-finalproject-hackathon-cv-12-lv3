@@ -1,10 +1,10 @@
 from tqdm import tqdm
 from config.config import OCR_CONFIG, API_CONFIG
 from utils import pdf_to_image, images_to_text, clean_text, chunkify_to_num_token, query_and_respond, MultiChatManager
-from utils import llm_refine
-from api import EmbeddingAPI, ChatCompletionAPI, ChatCompletionsExecutor, SummarizationExecutor
+from utils import llm_refine, query_and_respond_reranker_compare
+from api import EmbeddingAPI, ChatCompletionsExecutor, SummarizationExecutor
 from datebase import DatabaseConnection, DocumentUploader, SessionManager, PaperManager, ChatHistoryManager
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer, CrossEncoder
 
 if __name__ == '__main__':
 
@@ -19,6 +19,8 @@ if __name__ == '__main__':
     어떤 것이든 물어보세요!"""
     
     model = SentenceTransformer("dragonkue/bge-m3-ko")
+    reranker_model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+    
     ## 데이터베이스 연결
     db_connection = DatabaseConnection()
     conn = db_connection.connect()
@@ -29,20 +31,15 @@ if __name__ == '__main__':
             host = API_CONFIG['host2'],
             api_key=API_CONFIG['api_key'],
             request_id=API_CONFIG['request_id']
-        )
-        completion_executor1 = ChatCompletionAPI(
-            host = API_CONFIG['host'],
-            api_key=API_CONFIG['api_key'],
-            request_id=API_CONFIG['request_id']
-        )        
-        completion_executor2 = ChatCompletionsExecutor(
+        ) 
+        completion_executor = ChatCompletionsExecutor(
             host = API_CONFIG['host'],
             api_key=API_CONFIG['api_key'],
             request_id=API_CONFIG['request_id']
         )
 
         summarization_executor = SummarizationExecutor(
-             host = API_CONFIG['host2'],
+            host = API_CONFIG['host2'],
             api_key=API_CONFIG['api_key'],
             request_id=API_CONFIG['request_id']
         )
@@ -61,7 +58,7 @@ if __name__ == '__main__':
                     "page": int(i + 1),
                     "chunk": chunk
                 })
-
+                
         for i in tqdm(chunked_documents, desc="Generating Embeddings", total=len(chunked_documents)):
             # embedding = embedding_api.get_embedding(i["chunk"])
             #  i["embedding"] = embedding
@@ -85,7 +82,7 @@ if __name__ == '__main__':
 
         # 5. 문서 업로드
         uploader = DocumentUploader(conn)
-        uploader.upload_documents(chunked_documents)
+        uploader.upload_documents(chunked_documents, session_id)
         
         print("문서 업로드가 완료되었습니다.")
 
@@ -103,13 +100,21 @@ if __name__ == '__main__':
             if user_input.lower() in ['exit', 'quit', '대화종료']:
                 break
             
-            enhaced_query = llm_refine(user_input, completion_executor1)
-            
             # 8-1. 질의를 강화하기
+            enhaced_query = llm_refine(user_input, completion_executor)
             if enhaced_query:
                 print(f"질의강화 검색문: {enhaced_query}")
                 user_input = enhaced_query
-                
+            else:
+                print("질의 강화 쿼리가 존재하지 않습니다.")
+            # relevant_response = query_and_respond_reranker_compare(
+            #     query=user_input,
+            #     conn=conn,
+            #     model=model,
+            #     reranker_model=reranker_model,  # Cross-Encoder 모델 전달
+            #     session_id=session_id,
+            #     top_k=5
+            # )
             relevant_response = query_and_respond(
                 query=user_input,
                 conn=conn,
@@ -117,10 +122,11 @@ if __name__ == '__main__':
                 session_id=session_id,
                 top_k=5
             )
+            print(relevant_response)
             request_data = multichat.prepare_chat_request(user_input, context=relevant_response)
 
             try:
-                response = completion_executor2.execute(request_data, stream=True)
+                response = completion_executor.execute(request_data, stream=True)
 
                 if response:
                     # 응답 처리
