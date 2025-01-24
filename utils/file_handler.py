@@ -1,6 +1,5 @@
 import json
 import cv2
-import torch
 import numpy as np
 
 from PIL import Image
@@ -33,16 +32,6 @@ def save_image(image, path):
     else:
         raise TypeError(
             f"Invalid Input Type : Expected an instance of Image.Image or np.ndarray, but received{type(image)}")
-
-
-def select_device(device):
-    if device is not None:
-        return device
-
-    device = 'cpu'
-    if torch.cuda.is_available():
-        device = 'cuda'
-    return device
 
 
 def load_json_file(file_path):
