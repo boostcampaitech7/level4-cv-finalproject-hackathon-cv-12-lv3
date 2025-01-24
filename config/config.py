@@ -20,7 +20,8 @@ API_CONFIG = {
     'request_id': os.getenv('REQUEST_ID'),
     'embedding_endpoint': os.getenv('EMBEDDING_API_ENDPOINT'),
     'segmentation_endpoint': os.getenv('SEGMENTATION_API_ENDPOINT'),
-    'chat_completion_endpoint': '/testapp/v1/chat-completions/HCX-003'
+    'chat_completion_endpoint': '/testapp/v1/chat-completions/HCX-003',
+    'chat_completion_endpoint-light':'/testapp/v1/chat-completions/HCX-DASH-001'
 }
 
 # OCR 설정
