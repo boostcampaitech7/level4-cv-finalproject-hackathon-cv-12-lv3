@@ -1,13 +1,12 @@
 from PIL import Image
+import cv2
+import numpy as np
 
 from pathlib import Path
 
-from .text_ocr import TextOCR
 from .table_ocr import TableOCR
-from .formula_ocr import FormulaOCR
-from .formula_detect import Formula_Detect
 from .layout_analysis import LayoutAnalyzer, ElementType
-
+from .text_pipeline import Text_Extractor
 from .pdf2text_utils import select_device, box2list
 
 
@@ -17,12 +16,8 @@ class Pdf2Text(object):
                  lang):
         layout_path = Path.cwd() / Path(layout_path)
         self.device = select_device(None)
-
         self.layout_analysis = LayoutAnalyzer(layout_path, self.device)
-
-        self.text_ocr = TextOCR(lang)
-        self.formula_ocr = FormulaOCR()
-        self.formula_detector = Formula_Detect()
+        self.text_ocr = Text_Extractor(lang = lang)
         self.table_ocr = TableOCR(self.text_ocr, self.device)
 
     def __call__(self, image, **kwargs):
@@ -35,7 +30,6 @@ class Pdf2Text(object):
         layout_output, col_meta = self.layout_analysis.parse(img)
 
         # NOTE fitz에서 제공하는 page_id or page_number를 추가?
-
         final_outputs = []
         for layout_ele in layout_output:
             ele_type = layout_ele['type']
@@ -47,11 +41,17 @@ class Pdf2Text(object):
 
             if ele_type in (ElementType.TEXT, ElementType.TITLE, ElementType.PLAIN_TEXT):
                 # TODO TEXT OCR 이전의 전처리 코드 작성
-                pass
+                crop_img = np.array(crop_img)
+                crop_img = cv2.cvtColor(crop_img, cv2.COLOR_RGB2BGR)
+                final_outputs.append(self.text_ocr.Recognize_Text(crop_img))
+
             elif ele_type == ElementType.FORMULA:
                 # TODO FORMULA OCR 이전의 전처리 코드 작성
                 # 여기로는 독립된 FORMULA만 입력으로 들어온다.
-                pass
+                crop_img = np.array(crop_img)
+                crop_img = cv2.cvtColor(crop_img, cv2.COLOR_RGB2BGR)
+                final_outputs.append(self.text_ocr.Recognize_Formula(crop_img))
+                
             elif ele_type == ElementType.TABLE:
                 # TODO TABLE OCR 이전의 전처리 코드 작성
                 pass
