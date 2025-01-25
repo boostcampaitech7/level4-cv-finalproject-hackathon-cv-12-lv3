@@ -4,6 +4,7 @@ from utils import pdf_to_image, images_to_text, clean_text, chunkify_to_num_toke
 from utils import llm_refine, query_and_respond_reranker_compare
 from api import EmbeddingAPI, ChatCompletionsExecutor, SummarizationExecutor
 from datebase import DatabaseConnection, DocumentUploader, SessionManager, PaperManager, ChatHistoryManager
+from pdf2text import Pdf2Text
 from sentence_transformers import SentenceTransformer, CrossEncoder
 from hashlib import sha256
 
@@ -18,29 +19,30 @@ if __name__ == '__main__':
     SYSTEM_MESSAGE = """안녕하세요! 저는 논문 도우미 SummarAI입니다. 
     논문을 이해하고 분석하는 데 도움을 드릴 수 있어요. 
     어떤 것이든 물어보세요!"""
-    
+
     model = SentenceTransformer("dragonkue/bge-m3-ko")
     reranker_model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
-    
-    ## 데이터베이스 연결
+    # pdf2text = Pdf2Text()
+
+    # 데이터베이스 연결
     db_connection = DatabaseConnection()
     conn = db_connection.connect()
-    
+
     try:
         # 2. API 초기화
         embedding_api = EmbeddingAPI(
-            host = API_CONFIG['host2'],
+            host=API_CONFIG['host2'],
             api_key=API_CONFIG['api_key'],
             request_id=API_CONFIG['request_id']
-        ) 
+        )
         completion_executor = ChatCompletionsExecutor(
-            host = API_CONFIG['host'],
+            host=API_CONFIG['host'],
             api_key=API_CONFIG['api_key'],
             request_id=API_CONFIG['request_id']
         )
 
         summarization_executor = SummarizationExecutor(
-            host = API_CONFIG['host2'],
+            host=API_CONFIG['host2'],
             api_key=API_CONFIG['api_key'],
             request_id=API_CONFIG['request_id']
         )
@@ -51,7 +53,8 @@ if __name__ == '__main__':
         print("PDF를 이미지로 변환하였습니다.")
 
         for i, image in tqdm(enumerate(images), desc="이미지 처리 중"):
-            raw_text = images_to_text(image, OCR_CONFIG['host'], OCR_CONFIG['secret_key'])
+            raw_text = images_to_text(
+                image, OCR_CONFIG['host'], OCR_CONFIG['secret_key'])
             cleaned_text = clean_text(raw_text)
             chunks = chunkify_to_num_token(cleaned_text, CHUNK_SIZE)
             for chunk in chunks:
@@ -59,7 +62,7 @@ if __name__ == '__main__':
                     "page": int(i + 1),
                     "chunk": chunk
                 })
-                
+
         for i in tqdm(chunked_documents, desc="Generating Embeddings", total=len(chunked_documents)):
             # embedding = embedding_api.get_embedding(i["chunk"])
             #  i["embedding"] = embedding
@@ -84,11 +87,12 @@ if __name__ == '__main__':
         # 5. 문서 업로드
         uploader = DocumentUploader(conn)
         uploader.upload_documents(chunked_documents, session_id)
-        
+
         print("문서 업로드가 완료되었습니다.")
 
         # 6. 멀티챗 매니저 초기화
-        chat_manager = ChatHistoryManager(conn, embedding_api, completion_executor)
+        chat_manager = ChatHistoryManager(
+            conn, embedding_api, completion_executor)
         multichat = MultiChatManager()
 
         # 7. 시스템 메시지 설정
@@ -101,7 +105,7 @@ if __name__ == '__main__':
             user_input = input("사용자: ")
             if user_input.lower().replace(" ", "") in ['exit', 'quit', '대화종료']:
                 break
-            
+
             # 8-1. 질의를 강화하기
             enhaced_query = llm_refine(user_input, completion_executor)
             if enhaced_query:
@@ -126,7 +130,8 @@ if __name__ == '__main__':
                 chat_manager=chat_manager
             )
 
-            context_result = chat_manager.handle_question(user_input, session_id)
+            context_result = chat_manager.handle_question(
+                user_input, session_id)
 
             if relevant_response['type'] == "reference":
                 context = {
@@ -159,10 +164,12 @@ if __name__ == '__main__':
                     context=context
                 )
             print(relevant_response)
-            request_data = multichat.prepare_chat_request(user_input, context=relevant_response)
+            request_data = multichat.prepare_chat_request(
+                user_input, context=relevant_response)
 
             try:
-                response = completion_executor.execute(request_data, stream=True)
+                response = completion_executor.execute(
+                    request_data, stream=True)
 
                 if response:
                     # 응답 처리
@@ -195,13 +202,15 @@ if __name__ == '__main__':
                             session_id=session_id,
                             summary=summary_text,
                             summarized_chat_ids=[msg["chat_id"] for msg in
-                                                multichat.session_state["chat_log"]]
+                                                 multichat.session_state["chat_log"]]
                         )
 
-                        chat_manager.add_to_cache(session_id, user_input, context, summary_text)
+                        chat_manager.add_to_cache(
+                            session_id, user_input, context, summary_text)
                     else:
                         print(f"\nAI: {response['content']}")
-                        chat_manager.add_to_cache(session_id, user_input, context, response['content'])
+                        chat_manager.add_to_cache(
+                            session_id, user_input, context, response['content'])
 
                     multichat.initialize_chat("")
 

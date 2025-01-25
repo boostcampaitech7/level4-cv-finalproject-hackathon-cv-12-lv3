@@ -17,6 +17,7 @@ class Pdf2Text(object):
                  lang):
         layout_path = Path.cwd() / Path(layout_path)
         self.device = select_device(None)
+
         self.layout_analysis = LayoutAnalyzer(layout_path, self.device)
 
         self.text_ocr = TextOCR(lang)
