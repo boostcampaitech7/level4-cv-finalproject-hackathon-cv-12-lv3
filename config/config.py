@@ -28,7 +28,7 @@ API_CONFIG = {
 OCR_CONFIG = {
     'host': os.getenv('OCR_HOST'),
     'secret_key': os.getenv('OCR_SECRET_KEY'),
-    'layout_model_path': os.getenv('OCR_LAYOUT_MODEL_PATH')
+    'layout_model_path': 'pdf2text/models/doclayout_yolo_docstructbench_imgsz1024.pt'
 }
 
 
