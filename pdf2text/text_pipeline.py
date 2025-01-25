@@ -18,7 +18,10 @@ class Text_Extractor() :
             img[ymin-5:ymax+5, xmin:xmax] = 255
         return img
 
-    def Recognize(self, img) :
+    def Recognize_Formula(self, img) :
+        return f'$${self.mfr.ocr(img)}$$'
+
+    def Recognize_Text(self, img) :
         # 1. Formula Detection (mfd)
         # input: img, output: [[xmin, ymin, xmax, ymax], label, confidence_score]
         formula_det = self.mfd.detect(img)  
@@ -48,20 +51,22 @@ class Text_Extractor() :
             text_outs.append([[xmin,ymin,xmax,ymax], text])
 
         outs = [text for box, text in text_outs]
-        #print('원본: ' + ' '.join(outs))
+        print('원본: ' + ' '.join(outs))
 
         # 4. Text와 수식 같은 line으로 묶는 작업
         line = []
-        prev = 1e10
+        prev = text_outs[0][0][3]
         for idx, to in enumerate(text_outs) :
             cur_min,cur_max = to[0][1], to[0][3]
-            if prev > cur_min :
+            y = (cur_min + cur_max) // 2
+            if prev >= cur_min :
                 line.append(idx)
             else :
                 for i in line :
                     text_outs[i][0][3] = prev
                 line = [idx]
-                prev = cur_max
+                prev = y
+
         if line :
             for i in line :
                 text_outs[i][0][3] = prev
@@ -77,6 +82,6 @@ class Text_Extractor() :
 
         text_outs.extend(formula_outs)
         text_outs.sort(key=lambda x : (x[0][3], x[0][0]))
+        output = [text for bbox, text in text_outs]
 
-        # 5. 맞춤법 or 자연스럽게 수정하는 기능 추가 예정.
-        return text_outs
+        return ' '.join(output)
