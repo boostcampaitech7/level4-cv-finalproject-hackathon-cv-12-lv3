@@ -3,7 +3,8 @@ import os
 import json
 import re
 import sys
-sys.path.insert(0, os.path.abspath('/Users/haneol/Documents/Coding/level4-cv-finalproject-hackathon-cv-12-lv3/'))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(current_dir, ".."))
 from config.config import GOOGLE_SCHOLAR_API_KEY
 
 def get_cited_by_papers(query, topk=5):
