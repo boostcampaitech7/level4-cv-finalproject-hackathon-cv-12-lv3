@@ -29,3 +29,9 @@ OCR_CONFIG = {
     'host': os.getenv('OCR_HOST'),
     'secret_key': os.getenv('OCR_SECRET_KEY')
 }
+
+# 네이버 VOICE 설정
+VOICE_CONFIG = {
+    'voice_client_id': os.getenv('VOICE-CLIENT-ID'),
+    'voice_client_secret': os.getenv('VOICE-CLIENT-SECRET')
+}
