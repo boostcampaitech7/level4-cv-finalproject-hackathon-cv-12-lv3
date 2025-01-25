@@ -3,8 +3,10 @@ from .formula_ocr import FormulaOCR
 from .text_ocr import TextOCR
 import cv2
 
-class Text_Extractor() :
-    def __init__(self, lang='korean') :
+# img : text 정보가 담겨있는 layout
+# 
+class Text_Extractor :
+    def __init__(self, lang='en') :
         self.lang = lang
         self.mfd = Formula_Detect()
         self.mfr = FormulaOCR()
@@ -22,6 +24,7 @@ class Text_Extractor() :
         # 1. Formula Detection (mfd)
         # input: img, output: [[xmin, ymin, xmax, ymax], label, confidence_score]
         formula_det = self.mfd.detect(img)  
+
 
         # 2. Formula Recognize (mfr)
         # input: Cropimg, output: [[xmin, ymin, xmax, ymax], text]
@@ -46,22 +49,24 @@ class Text_Extractor() :
             xmax = int(max(x_coords))  
             ymax = int(max(y_coords))
             text_outs.append([[xmin,ymin,xmax,ymax], text])
-
+        text_outs.sort(key=lambda x:(x[0][1] + x[0][3], x[0][0]))
         outs = [text for box, text in text_outs]
         #print('원본: ' + ' '.join(outs))
 
         # 4. Text와 수식 같은 line으로 묶는 작업
         line = []
-        prev = 1e10
+        prev = text_outs[0][0][3]
         for idx, to in enumerate(text_outs) :
             cur_min,cur_max = to[0][1], to[0][3]
-            if prev > cur_min :
+            y = (cur_min + cur_max) // 2
+            if prev >= cur_min :
                 line.append(idx)
             else :
                 for i in line :
                     text_outs[i][0][3] = prev
                 line = [idx]
-                prev = cur_max
+                prev = y
+
         if line :
             for i in line :
                 text_outs[i][0][3] = prev
@@ -76,7 +81,6 @@ class Text_Extractor() :
                     break
 
         text_outs.extend(formula_outs)
-        text_outs.sort(key=lambda x : (x[0][3], x[0][0]))
+        text_outs.sort(key=lambda x : (x[0][3], x[0][0]+x[0][3]))
 
-        # 5. 맞춤법 or 자연스럽게 수정하는 기능 추가 예정.
         return text_outs
