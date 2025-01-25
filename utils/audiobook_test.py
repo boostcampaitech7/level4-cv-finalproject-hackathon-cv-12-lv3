@@ -3,7 +3,8 @@ import urllib.parse
 
 import sys
 import os
-sys.path.insert(0, os.path.abspath('/Users/haneol/Documents/Coding/level4-cv-finalproject-hackathon-cv-12-lv3/'))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(current_dir, ".."))
 from config.config import VOICE_CONFIG
 
 import io
