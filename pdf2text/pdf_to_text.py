@@ -8,7 +8,7 @@ from .formula_ocr import FormulaOCR
 from .formula_detect import Formula_Detect
 from .layout_analysis import LayoutAnalyzer, ElementType
 
-from .pdf2text_utils import select_device
+from .pdf2text_utils import select_device, box2list
 
 
 class Pdf2Text(object):
@@ -31,5 +31,6 @@ class Pdf2Text(object):
         if isinstance(image, Image.Image):
             img = image.convert('RGB')
 
-        self.layout_analysis.parse(img)
+        layout_output, col_meta = self.layout_analysis.parse(img)
+
         # NOTE fitz에서 제공하는 page_id or page_number를 추가?

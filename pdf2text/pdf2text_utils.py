@@ -371,3 +371,10 @@ def cal_block_xmin_xmax(lines, indentation_thrsh):
         return min_x, total_max_x
 
     return total_min_x, total_max_x
+
+
+def clipbox(box, img_height, img_width):
+    new_box = np.zeros_like(box)
+    new_box[:, 0] = np.clip(box[:, 0], 0, img_width - 1)
+    new_box[:, 1] = np.clip(box[:, 1], 0, img_height - 1)
+    return new_box
