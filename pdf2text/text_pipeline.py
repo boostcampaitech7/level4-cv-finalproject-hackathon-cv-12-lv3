@@ -19,6 +19,9 @@ class Text_Extractor() :
         return img
 
     def Recognize_Formula(self, img) :
+        # self issue 
+        # 이거 \ 하나만 나와야 하는데 \\로 나옴.
+        # 아마 후처리 해야할듯 나중에 ?
         return f'$${self.mfr.ocr(img)}$$'
 
     def Recognize_Text(self, img) :
