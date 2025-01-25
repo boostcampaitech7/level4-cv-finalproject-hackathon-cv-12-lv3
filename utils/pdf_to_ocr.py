@@ -1,5 +1,9 @@
-from pdf2image import convert_from_path
+import fitz
+import io
+import torch
+from PIL import Image
 from api import OCRAPIExecutor
+
 
 def pdf_to_image(pdf_path):
     """
@@ -7,10 +11,18 @@ def pdf_to_image(pdf_path):
     :param pdf_path: PDF 파일 경로
     :return: 이미지 리스트(PIL Image 객체)
     """
-    images = convert_from_path(pdf_path)
+    pages = fitz.open(pdf_path)
+    images = []
+    for page in pages:
+        pix = page.get_pixmap(dpi=300)
+        img_data = pix.tobytes(output='jpg', jpg_quality=200)
+        images.append(Image.open(io.BytesIO(img_data)).convert('RGB'))
     return images
 
+
 def images_to_text(image, ocr_host, ocr_secret_key):
+    # TODO 구현한 pdf2text 이식
+    # TODO Table OCR 이전에 crop한 image patch에 margin을 더해주면 성능 향상이 된다는 정보
     """
     이미지 파일에서 텍스트를 추출하고 후처리하여 반환하는 함수
     :param image: PIL Image 객체
@@ -23,5 +35,16 @@ def images_to_text(image, ocr_host, ocr_secret_key):
 
     if not isinstance(ocr_result, dict) or 'images' not in ocr_result:
         raise ValueError("Invalid OCR result format")
-    text = " ".join([field['inferText'] for field in ocr_result['images'][0]['fields']])
+    text = " ".join([field['inferText']
+                    for field in ocr_result['images'][0]['fields']])
     return text
+
+
+def select_device(device):
+    if device is not None:
+        return device
+
+    device = 'cpu'
+    if torch.cuda.is_available():
+        device = 'cuda'
+    return device

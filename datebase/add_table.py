@@ -54,7 +54,9 @@ try:
                 context_docs INTEGER[],
                 is_summary BOOLEAN DEFAULT FALSE,
                 summary_for_chat_id INTEGER REFERENCES chat_history(chat_id),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                embedding cdb_admin.vector(1024),
+                chat_type VARCHAR(20),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             );
         """)
     conn.commit()

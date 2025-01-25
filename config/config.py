@@ -20,7 +20,8 @@ API_CONFIG = {
     'request_id': os.getenv('REQUEST_ID'),
     'embedding_endpoint': os.getenv('EMBEDDING_API_ENDPOINT'),
     'segmentation_endpoint': os.getenv('SEGMENTATION_API_ENDPOINT'),
-    'chat_completion_endpoint': '/testapp/v1/chat-completions/HCX-003'
+    'chat_completion_endpoint': '/testapp/v1/chat-completions/HCX-003',
+    'chat_completion_endpoint-light':'/testapp/v1/chat-completions/HCX-DASH-001'
 }
 
 # OCR 설정
@@ -29,5 +30,13 @@ OCR_CONFIG = {
     'secret_key': os.getenv('OCR_SECRET_KEY')
 }
 
+
 # Google Scholar API 설정
 GOOGLE_SCHOLAR_API_KEY = os.getenv('SEARCHAPI_API_KEY')
+
+# 네이버 VOICE 설정
+VOICE_CONFIG = {
+    'voice_client_id': os.getenv('VOICE-CLIENT-ID'),
+    'voice_client_secret': os.getenv('VOICE-CLIENT-SECRET')
+}
+
