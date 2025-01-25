@@ -13,7 +13,7 @@ from pdf2text.yolov7.utils.datasets import letterbox
 sys.path.append(os.path.join(os.path.dirname(__file__), 'yolov7'))
 
 class Formula_Detect :
-    def __init__(self, model_path='models/yolo_mfd.pt') :
+    def __init__(self, model_path='models/yolo_mfd_2.pt') :
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         script_dir = os.path.dirname(os.path.abspath(__file__))
         self.path = os.path.join(script_dir, model_path)
