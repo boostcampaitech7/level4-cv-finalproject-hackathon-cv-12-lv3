@@ -405,3 +405,17 @@ def get_section_color(image, limit=2):
               if x <= limit or y <= limit or x >= w - limit or y >= h - limit]
 
     return Counter(pixels).most_common(1)[0][0]
+
+
+def expand_bbox_with_original(image, bbox, horizontal_margin, vertical_margin):
+    w, h = image.size
+
+    xmin, ymin, xmax, ymax = bbox
+
+    xmin, xmax = xmin - horizontal_margin, xmax + horizontal_margin
+    ymin, ymax = ymin - vertical_margin, ymax + vertical_margin
+
+    xmin, xmax = np.clip([xmin, xmax], 0, w)
+    ymin, ymax = np.clip([ymin, ymax], 0, h)
+
+    return (xmin, ymin, xmax, ymax)
