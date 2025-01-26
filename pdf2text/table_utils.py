@@ -257,3 +257,58 @@ def header_extended_cell_tree(cells):
             if not ancestors_by_row[row] == 1:
                 cells.remove(header_cell)
                 break
+
+
+def convert_to_md(cells):
+    pass
+
+
+def convert_to_element_tree(cells):
+    import xml.etree.ElementTree as ET
+
+    # 열 순서 보장
+    cells = sorted(cells, key=lambda cell: min([cell['col_indices']]))
+    # 행 순서 보장
+    cells = sorted(cells, key=lambda cell: min([cell['row_indices']]))
+
+    # 최상위 <table> 태그 생성
+    table = ET.Element("table")
+    before_row = -1
+
+    for cell in cells:
+        present_row = min(cell['row_indices'])
+
+        properties = {}
+        # col_indices가 1보다 크면 병합 열 수를 설정
+        col_span = len(cell['col_indices'])
+        if col_span > 1:
+            properties['col_span'] = str(col_span)
+
+        # row_indices가 1보다 크면 병합 행 수를 설정
+        row_span = len(cell['row_indices'])
+        if row_span > 1:
+            properties['row_span'] = str(row_span)
+
+        # 현재 row가 before_row보다 크면 새로운 행 생성
+        if present_row > before_row:
+            before_row = present_row
+            # cell이 col header 속성을 가지면 <th> 태그 생성
+            if cell['col header']:
+                cell_tag = "th"
+                row = ET.SubElement(table, "thead")
+            else:  # 아니면 <td> 태그 생성, <tr> 태그 내부에 생성됨.
+                cell_tag = "td"
+                row = ET.SubElement(table, "tr")
+        new_cell = ET.SubElement(row, cell_tag, attrib=properties)
+        new_cell.text = cell['cell text']
+    # <table>
+    #     <thead>
+    #         <th>Header 1</th>
+    #         <th>Header 2</th>
+    #     </thead>
+    #     <tr>
+    #         <td>Cell 1</td>
+    #         <td>Cell 2</td>
+    #     </tr>
+    # </table>
+    return table
