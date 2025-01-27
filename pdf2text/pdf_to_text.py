@@ -68,7 +68,7 @@ class Pdf2Text(object):
                 # NOTE TABLE은 정보가 잘리는 경우가 존재하기 때문에 기존 이미지에서 bbox 재조정
                 new_bbox = expand_bbox_with_original(img, bbox, 10, 10)
                 crop_img = img.crop(new_bbox)
-                res = self.table_ocr.ocr(crop_img)
+                final_outputs.append(self.table_ocr.ocr(crop_img))
 
             elif ele_type == ElementType.FIGURE:
                 # NOTE 이미지의 경우에는 어떤 방식으로 처리할지 결정되면 진행

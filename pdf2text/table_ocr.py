@@ -106,6 +106,9 @@ class TableOCR:
         for cells in tables_cells:
             self._ocr_cells(img, cells)
 
+        tables_cells = [table_utils.convert_to_md(
+            cells) for cells in tables_cells]
+
         return tables_cells
 
     def _ocr_cells(self, image, cells):

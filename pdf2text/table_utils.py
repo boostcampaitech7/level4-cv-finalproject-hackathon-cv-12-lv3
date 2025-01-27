@@ -260,7 +260,36 @@ def header_extended_cell_tree(cells):
 
 
 def convert_to_md(cells):
-    pass
+    table = convert_to_element_tree(cells)
+    if table.tag != 'table':
+        return "Unable to construct the table due to invalid XML input. Not Table"
+
+    md_table = []
+    # .	현재 노드를 선택 (상대 경로)
+    # 모든 하위 요소를 탐색 //
+    # .//th -> 최상위 태그에서 이루어지므로, 모든 <th> 태그를 탐색
+    headers = [th.text for th in table.findall(".//th")]
+
+    if headers:
+        # markdown 문법의 테이블 구성 양식을 추가
+        # | head1 | head2 | head3 |
+        md_table.append("| " + " | ".join(headers) + " |")
+        # | head1 | head2 | head3 |
+        # | --- | --- | --- |
+        md_table.append("| " + " | ".join(["---"] * len(headers)) + " |")
+
+    rows = table.findall(".//tr")
+
+    if rows:
+        for row in rows:
+            md_format_output = [td.text.replace(
+                "\n", ' ') for td in row.findall("td")]
+            if not md_format_output:
+                continue
+            md_table.append("| " + " | ".join(md_format_output) + " |")
+    else:
+        return "Unable to construct the table due to invalid XML input. Not Found Rows"
+    return "\n".join(md_table)
 
 
 def convert_to_element_tree(cells):
@@ -300,7 +329,7 @@ def convert_to_element_tree(cells):
                 cell_tag = "td"
                 row = ET.SubElement(table, "tr")
         new_cell = ET.SubElement(row, cell_tag, attrib=properties)
-        new_cell.text = cell['cell text']
+        new_cell.text = cell.get('cell text', "")
     # <table>
     #     <thead>
     #         <th>Header 1</th>

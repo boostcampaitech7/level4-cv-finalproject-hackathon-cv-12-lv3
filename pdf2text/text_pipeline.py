@@ -42,7 +42,11 @@ class Text_Extractor():
         text_outs = []
         img0 = img.copy()
         masked_image = self.masking_image(formula_outs, img0)
-        for bbox, tup in self.text_ocr.ocr(masked_image)[0]:
+
+        ocr_output = self.text_ocr.ocr(masked_image)[0]
+        if ocr_output is None:
+            return ""
+        for bbox, tup in ocr_output:
             text, score = tup
             # bbox에서 xmin, ymin, xmax, ymax 추출
             x_coords = [point[0] for point in bbox]
