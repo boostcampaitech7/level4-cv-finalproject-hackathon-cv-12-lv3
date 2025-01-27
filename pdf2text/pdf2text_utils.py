@@ -2,6 +2,7 @@ import re
 import torch
 import numpy as np
 
+from PIL import Image
 from collections import defaultdict
 from functools import cmp_to_key
 
@@ -378,3 +379,43 @@ def clipbox(box, img_height, img_width):
     new_box[:, 0] = np.clip(box[:, 0], 0, img_width - 1)
     new_box[:, 1] = np.clip(box[:, 1], 0, img_height - 1)
     return new_box
+
+
+def add_edge_margin(image, horizontal_margin, vertical_margin):
+    # 입력된 margin을 양쪽에 추가해주는 기능
+    # 일반적으로 Text에 사용됨.
+    bg_color = get_section_color(image)
+
+    w, h = image.size
+
+    new_w = w + horizontal_margin * 2
+    new_h = h + vertical_margin * 2
+
+    new_image = Image.new("RGB", (new_w, new_h), bg_color)
+    new_image.paste(image, (horizontal_margin, vertical_margin))
+
+    return new_image
+
+
+def get_section_color(image, limit=2):
+    from collections import Counter
+    w, h = image.size
+
+    pixels = [image.getpixel((x, y)) for x in range(w) for y in range(h)
+              if x <= limit or y <= limit or x >= w - limit or y >= h - limit]
+
+    return Counter(pixels).most_common(1)[0][0]
+
+
+def expand_bbox_with_original(image, bbox, horizontal_margin, vertical_margin):
+    w, h = image.size
+
+    xmin, ymin, xmax, ymax = bbox
+
+    xmin, xmax = xmin - horizontal_margin, xmax + horizontal_margin
+    ymin, ymax = ymin - vertical_margin, ymax + vertical_margin
+
+    xmin, xmax = np.clip([xmin, xmax], 0, w)
+    ymin, ymax = np.clip([ymin, ymax], 0, h)
+
+    return (xmin, ymin, xmax, ymax)

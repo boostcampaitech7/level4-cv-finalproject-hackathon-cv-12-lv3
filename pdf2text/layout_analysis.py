@@ -125,8 +125,6 @@ class LayoutAnalyzer:
         else:
             layout_output, col_meta = [], {}
 
-        # TODO 여기부터 다시 시작
-
         layout_output.extend(ignored_layout_out)
 
         return layout_output, col_meta
@@ -214,11 +212,15 @@ class LayoutAnalyzer:
 def fetch_column_info(layout_res, w, h):
     # 레이아웃 분석 결과의 요소들을 col을 기준으로 분류하는 함수
     # xmin값을 기준으로 layout 분석 결과 정렬
+
+    # TODO 정렬 기준 다시 고민해서 처리하기, 전부 같은 col로 처리되는 중
     layout_res.sort(key=lambda x: x["position"][0][0])
 
     # 열 너비 계산
     col_width = cal_column_width(layout_res, w, h)
     layout_res = locate_full_column(layout_res, col_width, w)
+
+    # full column일 때는 col_width 반환, sub column이면 col 넓이중 넓은 것으로
     col_width = max([item["position"][1][0] - item["position"][0][0]
                     for item in layout_res if item["category"] == "sub column"], default=col_width)
 
@@ -231,8 +233,8 @@ def fetch_column_info(layout_res, w, h):
 
         if col_left == w:
             col_left = xmin
-        # xmin이 열의 경계값에 포함되고, 요소의 너비가 열의 너비를 초과하지 않으면 열에 포함시킨다.
-        if xmin < col_left + col_width * 0.99 and xmax <= xmin + col_width * 1.02:
+        # xmin이 현재 열의 오른쪽 경계값에 포함되고, 요소의 너비가 열의 너비를 초과하지 않으면 열에 포함시킨다.
+        if xmin < col_left + col_width * 0.99 and xmax - xmin <= col_width * 1.02:
             info["col_number"] = cur_col
             col_left = min(col_left, xmin)
         else:
@@ -240,6 +242,7 @@ def fetch_column_info(layout_res, w, h):
             col_left = xmin
             info["col_number"] = cur_col
 
+    # col_number, 왼쪽 위쪽 모서리의 y, x값 기준으로 정렬
     layout_res.sort(key=lambda x: (
         x["col_number"], x["position"][0][1], x["position"][0][0]))
     return layout_res
@@ -292,6 +295,7 @@ def cal_column_width(layout_res, w, h):
 
 def locate_full_column(layout_res, col_width, img_width):
     for item in layout_res:
+        # xmax - xmin
         cur_width = item["position"][1][0] - item["position"][0][0]
         if cur_width > col_width * 1.5 or cur_width > img_width * 0.7:
             item["category"] = "full column"
