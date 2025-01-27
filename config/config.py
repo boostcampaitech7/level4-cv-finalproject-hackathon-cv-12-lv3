@@ -27,6 +27,13 @@ API_CONFIG = {
 # OCR 설정
 OCR_CONFIG = {
     'host': os.getenv('OCR_HOST'),
+    'secret_key': os.getenv('OCR_SECRET_KEY')
+}
+
+# AI API 설정
+AI_CONFIG={
+    'claude' : os.getenv('CLAUDE'),
+    'openai' : os.getenv('OPEN_AI'),
     'secret_key': os.getenv('OCR_SECRET_KEY'),
     'layout_model_path': 'pdf2text/models/doclayout_yolo_docstructbench_imgsz1024.pt'
 }

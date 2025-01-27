@@ -129,7 +129,6 @@ if __name__ == '__main__':
                 top_k=5,
                 chat_manager=chat_manager
             )
-
             context_result = chat_manager.handle_question(
                 user_input, session_id)
 
