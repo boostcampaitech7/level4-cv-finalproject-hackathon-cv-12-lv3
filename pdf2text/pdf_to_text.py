@@ -76,4 +76,4 @@ class Pdf2Text(object):
             else:  # 나머지 타입은 처리하지않는 유형이므로 무시
                 pass
 
-        return final_outputs
+        return " ".join(final_outputs)

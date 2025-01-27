@@ -1,22 +1,4 @@
-import fitz
-import io
-from PIL import Image
 from api import OCRAPIExecutor
-
-
-def pdf_to_image(pdf_path):
-    """
-    PDF 파일을 이미지로 변환하는 함수
-    :param pdf_path: PDF 파일 경로
-    :return: 이미지 리스트(PIL Image 객체)
-    """
-    pages = fitz.open(pdf_path)
-    images = []
-    for page in pages:
-        pix = page.get_pixmap(dpi=300)
-        img_data = pix.tobytes(output='jpg', jpg_quality=200)
-        images.append(Image.open(io.BytesIO(img_data)).convert('RGB'))
-    return images
 
 
 def images_to_text(image, ocr_host, ocr_secret_key):
