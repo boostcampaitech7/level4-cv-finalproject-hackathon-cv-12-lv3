@@ -1,10 +1,27 @@
+import io
 import re
+import fitz
 import torch
 import numpy as np
 
 from PIL import Image
 from collections import defaultdict
 from functools import cmp_to_key
+
+
+def pdf_to_image(pdf_path):
+    """
+    PDF 파일을 이미지로 변환하는 함수
+    :param pdf_path: PDF 파일 경로
+    :return: 이미지 리스트(PIL Image 객체)
+    """
+    pages = fitz.open(pdf_path)
+    images = []
+    for page in pages:
+        pix = page.get_pixmap(dpi=300)
+        img_data = pix.tobytes(output='jpg', jpg_quality=200)
+        images.append(Image.open(io.BytesIO(img_data)).convert('RGB'))
+    return images
 
 
 def select_device(device):
