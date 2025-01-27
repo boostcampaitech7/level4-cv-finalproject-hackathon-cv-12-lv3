@@ -42,6 +42,8 @@ def clean_clova_response(response_dict):
         return response_dict['message']['content']
     return "응답을 가져오는데 실패했습니다."
 
+### Multi Retrival 하는 코드 추가하기
+
 def query_and_respond(query: str, conn, model, session_id, top_k=3):
     """
     사용자의 쿼리를 임베딩하고, 검색하는 함수
@@ -74,7 +76,7 @@ def query_and_respond(query: str, conn, model, session_id, top_k=3):
         print(f"벡터 검색 중 에러 발생: {str(e)}")
         return None
     
-    
+### 이부분도 받은 모델을 기반으로 rerank 진행후 query_and_respond를 수행할 수 있도록 수정하기
     
 def rerank_with_cross_encoder(query, documents, model, top_k=10):
     """
@@ -96,6 +98,8 @@ def rerank_with_cross_encoder(query, documents, model, top_k=10):
     reranked_documents = sorted(documents, key=lambda x: x["score"], reverse=True)
     return reranked_documents[:top_k]
 
+
+### 여기서 비교하는 코드에서 여러 모델을 받아서 비교할 수 있도록 수정하기.
 def query_and_respond_reranker_compare(query: str, conn, model, reranker_model, session_id, top_k=3):
     """
     BGE-M3만 사용한 검색과 BGE-M3 + Cross-Encoder 리랭커를 사용한 검색을 비교합니다.
