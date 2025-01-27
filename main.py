@@ -1,17 +1,23 @@
+import argparse
+
 from tqdm import tqdm
-from config.config import OCR_CONFIG, API_CONFIG
-from utils import pdf_to_image, images_to_text, clean_text, chunkify_to_num_token, query_and_respond, MultiChatManager
+from config.config import AI_CONFIG, API_CONFIG
+from utils import images_to_text, clean_text, chunkify_to_num_token, query_and_respond, MultiChatManager
 from utils import llm_refine, query_and_respond_reranker_compare
 from api import EmbeddingAPI, ChatCompletionsExecutor, SummarizationExecutor
 from datebase import DatabaseConnection, DocumentUploader, SessionManager, PaperManager, ChatHistoryManager
-from pdf2text import Pdf2Text
+from pdf2text import Pdf2Text, pdf_to_image
 from sentence_transformers import SentenceTransformer, CrossEncoder
 from hashlib import sha256
 
+
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("path", type=str, help="Using Pdf Path")
+    args = parser.parse_args()
 
     # 파일 설정 부분
-    FILE_NAME = "transformer.pdf"
+    FILE_NAME = args.path
     CHUNK_SIZE = 256
 
     TOKEN_LIMIT = 4096
@@ -22,7 +28,7 @@ if __name__ == '__main__':
 
     model = SentenceTransformer("dragonkue/bge-m3-ko")
     reranker_model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
-    # pdf2text = Pdf2Text()
+    pdf2text = Pdf2Text(AI_CONFIG["layout_model_path"], lang="en")
 
     # 데이터베이스 연결
     db_connection = DatabaseConnection()
@@ -53,10 +59,12 @@ if __name__ == '__main__':
         print("PDF를 이미지로 변환하였습니다.")
 
         for i, image in tqdm(enumerate(images), desc="이미지 처리 중"):
-            raw_text = images_to_text(
-                image, OCR_CONFIG['host'], OCR_CONFIG['secret_key'])
-            cleaned_text = clean_text(raw_text)
-            chunks = chunkify_to_num_token(cleaned_text, CHUNK_SIZE)
+            # raw_text = images_to_text(
+            #     image, OCR_CONFIG['host'], OCR_CONFIG['secret_key'])
+            # cleaned_text = clean_text(raw_text)
+            raw_text = pdf2text.recognize(image)
+            print(raw_text)
+            chunks = chunkify_to_num_token(raw_text, CHUNK_SIZE)
             for chunk in chunks:
                 chunked_documents.append({
                     "page": int(i + 1),
@@ -162,7 +170,7 @@ if __name__ == '__main__':
                     user_input,
                     context=context
                 )
-            print(relevant_response)
+
             request_data = multichat.prepare_chat_request(
                 user_input, context=relevant_response)
 
