@@ -289,7 +289,7 @@ def convert_to_md(cells):
             md_table.append("| " + " | ".join(md_format_output) + " |")
     else:
         return "Unable to construct the table due to invalid XML input. Not Found Rows"
-    return "\n".join(md_table) + "\n"
+    return "\n" + "\n".join(md_table) + "\n"
 
 
 def convert_to_element_tree(cells):
