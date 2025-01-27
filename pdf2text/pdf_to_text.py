@@ -47,7 +47,7 @@ class Pdf2Text(object):
             if ele_type in (ElementType.TEXT, ElementType.TITLE, ElementType.PLAIN_TEXT):
                 # TODO TEXT OCR 이전의 전처리 코드 작성
                 # NOTE 배경 색상을 기준으로 margin 추가 기능
-                # crop_img = add_edge_margin(crop_img, 20, 20)
+                crop_img = add_edge_margin(crop_img, 20, 20)
 
                 crop_img = np.array(crop_img)
                 crop_img = cv2.cvtColor(crop_img, cv2.COLOR_RGB2BGR)
