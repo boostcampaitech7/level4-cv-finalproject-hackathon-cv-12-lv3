@@ -1,9 +1,9 @@
 import json
-
 from api.api_classes import ChatCompletionsExecutor
 from config.config import API_CONFIG
 
-prompts ={"first_prompt": """
+prompts = {
+    "first_prompt": """
     Generate a 7-minute podcast conversation based on the provided academic research paper. The conversation should involve two speakers Alex is the podcast MC and an expert on the research paper. Jamie is the guest, asking questions and curious about the research findings.
      1. Structure: Begin with simpler questions to introduce the paper’s basics, gradually moving to more complex and detailed topics. DO NOT switch topics abruptly or start a new episode.
      2. Tone: The conversation should feel natural and engaging. 
@@ -47,10 +47,7 @@ prompts ={"first_prompt": """
 
     Write in Korean.
     """
-
 }
-
-
 
 def write_script_part(prompt_key, text_content, history=None):
     """
@@ -61,29 +58,29 @@ def write_script_part(prompt_key, text_content, history=None):
         api_key=API_CONFIG["api_key"],
         request_id=API_CONFIG["request_id"],
     )
-
-    # Prepare the messages for the API call
-    messages = [
-        {"role": "system", "content": prompts[prompt_key]},
-        {"role": "user", "content": text_content},
-    ]
-
+    
+    messages = [{"role": "user", "content": prompts[prompt_key]}]
     if history:
         messages.extend(history)
 
-    # # Calculate and print the token length
-    # token_length = calculate_token_length(messages)
-    # print(f"[{prompt_key}] Total input token length: {token_length}")
-
-    # Call the API
-    response = chat_api.execute(messages,stream=False)
+    request_data = {
+        'messages': messages,
+        'topP': 0.8,
+        'topK': 0,
+        'maxTokens': 4096,
+        'temperature': 0.5,
+        'repeatPenalty': 5.0,
+        'stopBefore': [],
+        'includeAiFilters': True,
+        'seed': 0
+    }
+    response = chat_api.execute(request_data, stream=False)
     return response
 
 def write_full_script(text_content):
     """
     Generate the full script by combining all four parts.
     """
-    # Generate each part sequentially
     first_response = write_script_part("first_prompt", text_content)
     history = [
         {"role": "system", "content": prompts["first_prompt"]},
@@ -96,8 +93,6 @@ def write_full_script(text_content):
 
     third_response = write_script_part("third_prompt", text_content, history)
 
-
-    # Combine all responses
     full_script = (
         first_response["message"]["content"]
         + "\n\n"
@@ -110,11 +105,8 @@ def write_full_script(text_content):
 if __name__ == "__main__":
     text_file_path = "/data/ephemeral/home/script/summary.txt"
     try:
-        # Load the text content from file
         with open(text_file_path, "r", encoding="utf-8") as file:
             text_content = file.read()
-
-        # Generate the script
         script = write_full_script(text_content)
         print("Generated Academic Presentation Script:\n")
         print(script)
