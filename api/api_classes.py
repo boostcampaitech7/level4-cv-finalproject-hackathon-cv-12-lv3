@@ -59,8 +59,11 @@ class ChatCompletionsExecutor(BaseAPIExecutor):
                                     continue
 
                     if final_result:  # 최종 결과 반환
+                        content = final_result["message"]["content"]
+                        if 'Reference documents:' in content:
+                            content = content.split('Reference documents:')[0]
                         return {
-                            "content": final_result["message"]["content"],
+                            "content": content,
                             "context": final_result["message"]["content"],
                             "inputLength": final_result["inputLength"],
                             "outputLength": final_result["outputLength"]

@@ -9,3 +9,9 @@ __pycache__/
 *.log
 *.tmp
 *.pdf
+*.jpg
+*.png
+*.txt
+
+# 테스트용 파일
+test.py

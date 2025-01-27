@@ -126,7 +126,15 @@ class MultiChatManager:
                 "예시 3: 법률 문서에 따르면, 계약을 체결할 때에는 당사자 간의 합의가 명확하게 기록되어야 합니다. 계약서에는 계약의 목적, 당사자의 권리와 의무, 계약 기간, 위약금 조항 등이 포함되어야 하며, 이를 통해 분쟁 발생 시 명확한 근거를 제공할 수 있습니다. 예를 들어, 임대차 계약에서는 임대인과 임차인의 책임 범위가 명시되어야 하며, 이는 계약의 투명성을 높이는 데 기여합니다."
             ])
         }
+
         current_messages = [base_system_message]
+
+        if self.session_state.get('last_response'):
+            previous_context = {
+                "role": "system",
+                "content": f"Previous answer: {self.session_state['last_response']}"
+            }
+            current_messages.append(previous_context)
 
         if context:
             context_message = {
@@ -147,11 +155,11 @@ class MultiChatManager:
 
         return {
             "messages": self.session_state['preset_messages'],
-            "maxTokens": 256,
-            "temperature": 0.5,
+            "maxTokens": 1024,
+            "temperature": 0.3,
             "topK": 0,
-            "topP": 0.6,
-            "repeatPenalty": 1.2,
+            "topP": 0.4,
+            "repeatPenalty": 1.3,
             "stopBefore": [],
             "includeAiFilters": True,
             "seed": 0,

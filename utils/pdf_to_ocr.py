@@ -1,6 +1,5 @@
 import fitz
 import io
-import torch
 from PIL import Image
 from api import OCRAPIExecutor
 
@@ -21,6 +20,8 @@ def pdf_to_image(pdf_path):
 
 
 def images_to_text(image, ocr_host, ocr_secret_key):
+    # TODO 구현한 pdf2text 이식
+    # TODO Table OCR 이전에 crop한 image patch에 margin을 더해주면 성능 향상이 된다는 정보
     """
     이미지 파일에서 텍스트를 추출하고 후처리하여 반환하는 함수
     :param image: PIL Image 객체
@@ -36,13 +37,3 @@ def images_to_text(image, ocr_host, ocr_secret_key):
     text = " ".join([field['inferText']
                     for field in ocr_result['images'][0]['fields']])
     return text
-
-
-def select_device(device):
-    if device is not None:
-        return device
-
-    device = 'cpu'
-    if torch.cuda.is_available():
-        device = 'cuda'
-    return device
