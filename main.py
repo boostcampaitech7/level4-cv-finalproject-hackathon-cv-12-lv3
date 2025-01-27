@@ -122,7 +122,7 @@ if __name__ == '__main__':
                 session_id=session_id,
                 top_k=5
             )
-            print(relevant_response)
+            # print(relevant_response)
             request_data = multichat.prepare_chat_request(user_input, context=relevant_response)
 
             try:

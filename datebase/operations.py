@@ -54,7 +54,7 @@ class DocumentUploader:
     def __init__(self, connection):
         self.conn = connection
 
-    def upload_documents(self, chunked_documents):
+    def upload_documents(self, chunked_documents, session_id):
         try:
             cur = self.conn.cursor()
             count = 0
@@ -62,9 +62,9 @@ class DocumentUploader:
             for doc in tqdm(chunked_documents):
                 vector_str = f"[{','.join(map(str, doc['embedding']))}]"
                 cur.execute("""
-                    INSERT INTO public.documents (page, content, embedding)
-                    VALUES (%s, %s, %s::cdb_admin.vector)            
-                """, (doc["page"], doc["chunk"], vector_str))
+                    INSERT INTO public.documents (session_id, page, content, embedding)
+                    VALUES (%s, %s, %s, %s::cdb_admin.vector)            
+                """, (session_id, doc["page"], doc["chunk"], vector_str))
                 count += 1
             
             self.conn.commit()

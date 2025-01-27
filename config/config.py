@@ -29,3 +29,9 @@ OCR_CONFIG = {
     'host': os.getenv('OCR_HOST'),
     'secret_key': os.getenv('OCR_SECRET_KEY')
 }
+
+# AI API 설정
+AI_CONFIG={
+    'claude' : os.getenv('CLAUDE'),
+    'openai' : os.getenv('OPEN_AI')
+}
