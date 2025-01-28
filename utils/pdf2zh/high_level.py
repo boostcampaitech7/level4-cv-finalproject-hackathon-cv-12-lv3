@@ -176,7 +176,7 @@ def translate_stream(
 ):
     font_list = [("tiro", None)]
 
-    font_path = download_remote_fonts(lang_out.lower())
+    font_path = os.path.join(os.getcwd(), 'utils/pdf2zh/GoNotoKurrent-Regular.ttf')
     noto_name = NOTO_NAME
     noto = Font(noto_name, font_path)
     font_list.append((noto_name, font_path))
