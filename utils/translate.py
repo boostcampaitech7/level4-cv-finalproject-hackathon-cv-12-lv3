@@ -7,6 +7,8 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+import os
+import json
 from string import Template
 from typing import List, Optional
 
@@ -96,7 +98,28 @@ def parse_args(args: Optional[List[str]]) -> argparse.Namespace:
     parsed_args = create_parser().parse_args(args=args)
     return parsed_args
 
+def save_new_json(page_number) :
+    if os.path.exists('original.json'):
+        with open('original.json', 'r') as f:
+            existing_data = json.load(f)
+    else:
+        existing_data = {}
 
+    if os.path.exists('new.json') :
+        with open('new.json', 'r') as f :
+            new_data = json.load(f)
+    else :
+        new_data = {}
+
+    if str(page_number) not in existing_data :
+        return False
+
+    new_data[str(page_number)] = ' '.join(existing_data[str(page_number)])
+
+    with open('new.json', 'w') as f:
+        json.dump(new_data, f,ensure_ascii=False, indent=4)
+
+    return True
 def main(args: Optional[List[str]] = None) -> int:
     logging.basicConfig()
     parsed_args = parse_args(args)
@@ -104,6 +127,13 @@ def main(args: Optional[List[str]] = None) -> int:
 
     print(parsed_args)
     translate(model=ModelInstance.value, **vars(parsed_args))
+
+    idx = 0
+    while True :
+        if save_new_json(idx) :
+            idx += 1
+        else :
+            break
     return 0
 
 
