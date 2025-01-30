@@ -1,13 +1,14 @@
-from PIL import Image
+import re
 import cv2
 import numpy as np
 
+from PIL import Image
 from pathlib import Path
 
 from .table_ocr import TableOCR
 from .layout_analysis import LayoutAnalyzer, ElementType
 from .text_pipeline import Text_Extractor
-from .pdf2text_utils import select_device, box2list, add_edge_margin, expand_bbox_with_original
+from .pdf2text_utils import select_device, box2list, add_edge_margin, expand_bbox_with_original, matching_captiong
 
 
 class Pdf2Text(object):
@@ -30,9 +31,9 @@ class Pdf2Text(object):
             img = image.convert('RGB')
 
         layout_output, _ = self.layout_analysis.parse(img)
-
         # NOTE fitz에서 제공하는 page_id or page_number를 추가?
-        final_outputs = []
+        final_outputs, caption_outputs = [], []
+        table_figure_outputs = []
         for idx, layout_ele in enumerate(layout_output):
             ele_type = layout_ele['type']
 
@@ -49,8 +50,15 @@ class Pdf2Text(object):
 
                 crop_img = np.array(crop_img)
                 crop_img = cv2.cvtColor(crop_img, cv2.COLOR_RGB2BGR)
-                final_outputs.append(
-                    self.text_ocr.Recognize_Text(crop_img, lang))
+
+                text_ocr_output = self.text_ocr.Recognize_Text(crop_img, lang)
+
+                # caption일 경우 따로 추출
+                if layout_ele['caption'] is not None:
+                    caption_outputs.append(
+                        (text_ocr_output, bbox, layout_ele['caption']))
+                else:
+                    final_outputs.append(text_ocr_output)
 
             elif ele_type == ElementType.FORMULA:
                 # TODO FORMULA OCR 이전의 전처리 코드 작성
@@ -67,11 +75,13 @@ class Pdf2Text(object):
                 # NOTE TABLE은 정보가 잘리는 경우가 존재하기 때문에 기존 이미지에서 bbox 재조정
                 new_bbox = expand_bbox_with_original(img, bbox, 10, 10)
                 crop_img = img.crop(new_bbox)
-                final_outputs.append(self.table_ocr.ocr(crop_img))
+                table_figure_outputs.append(
+                    (self.table_ocr.ocr(crop_img), new_bbox, "Table"))
+                # final_outputs.append(self.table_ocr.ocr(crop_img))
 
             elif ele_type == ElementType.FIGURE:
                 # NOTE 이미지의 경우에는 어떤 방식으로 처리할지 결정되면 진행
-                pass
+                table_figure_outputs.append((crop_img, bbox, "Figure"))
             else:  # 나머지 타입은 처리하지않는 유형이므로 무시
                 pass
 

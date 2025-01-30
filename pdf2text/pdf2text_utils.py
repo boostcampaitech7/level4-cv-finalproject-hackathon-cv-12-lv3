@@ -450,3 +450,52 @@ def expand_bbox_with_original(image, bbox, horizontal_margin, vertical_margin):
     ymin, ymax = np.clip([ymin, ymax], 0, h)
 
     return (xmin, ymin, xmax, ymax)
+
+
+def matching_captiong(captions, objects, lang):
+    # 위치기반 caption 매칭 로직
+    matched_result = {'figure': [], 'table': []}
+
+    if lang not in ['korean', 'en']:
+        raise ValueError(
+            f"Unsupported language: {lang}. Supported languages are 'korean' and 'en'.")
+
+    for caption_text, caption_bbox, caption_type in captions:
+        caption_number = extract_caption_number(caption_text)
+        if caption_number is None:
+            continue
+
+        matched_object = None
+        min_distance = float('inf')
+
+        for obj, obj_bbox, obj_type in objects:
+            if obj_type.lower() != caption_type.split("_")[0].lower():
+                continue
+
+            cur_distance = calculate_bbox_distance(caption_bbox, obj_bbox)
+            if cur_distance < min_distance:
+                min_distance = cur_distance
+                matched_object = {
+                    "caption_number": caption_number,
+                    'obj': obj,
+                    'obj_bbox': obj_bbox,
+                    'caption_bbox': caption_bbox,
+                    'caption_text': caption_text
+                }
+
+        matched_result[obj_type.lower()].append(matched_object)
+
+    return matched_result
+
+
+def extract_caption_number(caption_text):
+    # caption이 몇 번을 나타내는지 확인
+    result = re.search(r"(\d+)", caption_text)
+    if result:
+        return result.group()
+    return None
+
+
+def calculate_bbox_distance(bbox1, bbox2):
+    # ymin - ymin
+    return abs(bbox1[1] - bbox2[1])
