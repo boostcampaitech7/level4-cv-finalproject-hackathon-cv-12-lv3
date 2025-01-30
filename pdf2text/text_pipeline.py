@@ -25,7 +25,7 @@ class Text_Extractor():
         # 아마 후처리 해야할듯 나중에 ?
         return f'$${self.mfr.ocr(img)}$$'
 
-    def Recognize_Text(self, img):
+    def Recognize_Text(self, img, lang):
         # 1. Formula Detection (mfd)
         # input: img, output: [[xmin, ymin, xmax, ymax], label, confidence_score]
         formula_det = self.mfd.detect(img)
@@ -44,7 +44,14 @@ class Text_Extractor():
         img0 = img.copy()
         masked_image = self.masking_image(formula_outs, img0)
 
-        ocr_output = self.text_ocr.ocr(masked_image)[0]
+        if lang == "korean":
+            ocr_output = self.korean_ocr.ocr(masked_image)[0]
+        elif lang == "en":
+            ocr_output = self.english_ocr.ocr(masked_image)[0]
+        else:
+            raise ValueError(
+                f"Unsupported language: {lang}. Supported languages are 'korean' and 'en'.")
+
         if ocr_output is None:
             return ""
         for bbox, tup in ocr_output:

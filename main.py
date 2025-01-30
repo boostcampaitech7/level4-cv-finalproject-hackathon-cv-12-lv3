@@ -62,7 +62,7 @@ if __name__ == '__main__':
             # raw_text = images_to_text(
             #     image, OCR_CONFIG['host'], OCR_CONFIG['secret_key'])
             # cleaned_text = clean_text(raw_text)
-            raw_text = pdf2text.recognize(image, lang=lang)
+            raw_text = pdf2text.recognize(image, lang)
             chunks = chunkify_to_num_token(raw_text, CHUNK_SIZE)
             for chunk in chunks:
                 chunked_documents.append({

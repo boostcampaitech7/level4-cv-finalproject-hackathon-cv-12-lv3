@@ -20,12 +20,12 @@ class Pdf2Text(object):
         self.text_ocr = Text_Extractor()
 
         # 이거는 변수명 좀 수정해야할 듯 합니다.
-        self.table_ocr = TableOCR(self.text_ocr.text_ocr, self.device)
+        self.table_ocr = TableOCR(self.text_ocr.english_ocr, self.device)
 
     def __call__(self, image, **kwargs):
         return self.recognize(image, **kwargs)
 
-    def recognize(self, image, **kwargs):
+    def recognize(self, image, lang, **kwargs):
         if isinstance(image, Image.Image):
             img = image.convert('RGB')
 
@@ -49,7 +49,8 @@ class Pdf2Text(object):
 
                 crop_img = np.array(crop_img)
                 crop_img = cv2.cvtColor(crop_img, cv2.COLOR_RGB2BGR)
-                final_outputs.append(self.text_ocr.Recognize_Text(crop_img))
+                final_outputs.append(
+                    self.text_ocr.Recognize_Text(crop_img, lang))
 
             elif ele_type == ElementType.FORMULA:
                 # TODO FORMULA OCR 이전의 전처리 코드 작성
