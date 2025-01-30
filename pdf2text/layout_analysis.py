@@ -154,10 +154,15 @@ class LayoutAnalyzer:
         final_out = []
         for box_info in layout_output:
             image_type = box_info["type"]
+            if image_type in ["figure_caption", "table_caption", "formula_caption"]:
+                caption = image_type
+            else:
+                caption = None
             isolated = image_type in self.is_isolated
             if image_type in self.ignored_types:
                 image_type = ElementType.IGNORED
             else:
+                # NOTE 여기서 caption 구분 가능
                 image_type = self.label2type.get(
                     image_type, ElementType.UNKNOWN)
             if table_as_image and image_type == ElementType.TABLE:
@@ -165,6 +170,7 @@ class LayoutAnalyzer:
             final_out.append(
                 {
                     "type": image_type,
+                    'caption': caption,
                     "position": clipbox(box_info["position"], h, w),
                     "prob": box_info["prob"],
                     "col_number": box_info["col_number"],
