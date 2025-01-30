@@ -12,13 +12,12 @@ from .pdf2text_utils import select_device, box2list, add_edge_margin, expand_bbo
 
 class Pdf2Text(object):
     def __init__(self,
-                 layout_path,
-                 lang):
+                 layout_path):
         layout_path = Path.cwd() / Path(layout_path)
         self.device = select_device(None)
 
         self.layout_analysis = LayoutAnalyzer(layout_path, self.device)
-        self.text_ocr = Text_Extractor(lang=lang)
+        self.text_ocr = Text_Extractor()
 
         # 이거는 변수명 좀 수정해야할 듯 합니다.
         self.table_ocr = TableOCR(self.text_ocr.text_ocr, self.device)

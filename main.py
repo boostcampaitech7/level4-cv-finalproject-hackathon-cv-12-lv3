@@ -28,7 +28,7 @@ if __name__ == '__main__':
 
     model = SentenceTransformer("dragonkue/bge-m3-ko")
     reranker_model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
-    pdf2text = Pdf2Text(AI_CONFIG["layout_model_path"], lang="en")
+    pdf2text = Pdf2Text(AI_CONFIG["layout_model_path"])
 
     # 데이터베이스 연결
     db_connection = DatabaseConnection()
@@ -55,15 +55,14 @@ if __name__ == '__main__':
 
         # 3. PDF 처리 및 임베딩
         chunked_documents = []
-        images = pdf_to_image(FILE_NAME)
+        images, lang = pdf_to_image(FILE_NAME)
         print("PDF를 이미지로 변환하였습니다.")
 
         for i, image in tqdm(enumerate(images), desc="이미지 처리 중"):
             # raw_text = images_to_text(
             #     image, OCR_CONFIG['host'], OCR_CONFIG['secret_key'])
             # cleaned_text = clean_text(raw_text)
-            raw_text = pdf2text.recognize(image)
-            print(raw_text)
+            raw_text = pdf2text.recognize(image, lang=lang)
             chunks = chunkify_to_num_token(raw_text, CHUNK_SIZE)
             for chunk in chunks:
                 chunked_documents.append({

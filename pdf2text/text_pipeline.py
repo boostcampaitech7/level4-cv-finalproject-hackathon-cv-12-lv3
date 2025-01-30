@@ -4,11 +4,12 @@ from .text_ocr import TextOCR
 
 
 class Text_Extractor():
-    def __init__(self, lang='korean'):
-        self.lang = lang
+    def __init__(self):
         self.mfd = Formula_Detect()
         self.mfr = FormulaOCR()
-        self.text_ocr = TextOCR(lang=self.lang)
+
+        self.korean_ocr = TextOCR(lang="korean")
+        self.english_ocr = TextOCR(lang="en")
 
     def masking_image(self, formula, img):
         for bbox, _ in formula:
