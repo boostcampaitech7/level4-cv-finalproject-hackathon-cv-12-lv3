@@ -35,7 +35,6 @@ class Pdf2Text(object):
         # NOTE fitz에서 제공하는 page_id or page_number를 추가?
         final_outputs = []
         for idx, layout_ele in enumerate(layout_output):
-
             ele_type = layout_ele['type']
 
             if ele_type == ElementType.IGNORED:

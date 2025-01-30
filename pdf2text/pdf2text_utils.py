@@ -9,6 +9,17 @@ from collections import defaultdict
 from functools import cmp_to_key
 
 
+def divide_pdf_lang(page):
+    # pdf의 첫 페이지로 판단
+    total_text = page.get_text()
+
+    korean_texts = len(re.findall(r'[\uac00-\ud7a3]', total_text))
+    english_texts = len(re.findall(r'[a-zA-Z]', total_text))
+
+    # 길이로 판단
+    return "korean" if korean_texts >= english_texts else "en"
+
+
 def pdf_to_image(pdf_path):
     """
     PDF 파일을 이미지로 변환하는 함수
@@ -17,11 +28,14 @@ def pdf_to_image(pdf_path):
     """
     pages = fitz.open(pdf_path)
     images = []
+
+    lang = divide_pdf_lang(pages[0])
+
     for page in pages:
         pix = page.get_pixmap(dpi=300)
         img_data = pix.tobytes(output='jpg', jpg_quality=200)
         images.append(Image.open(io.BytesIO(img_data)).convert('RGB'))
-    return images
+    return images, lang
 
 
 def select_device(device):
