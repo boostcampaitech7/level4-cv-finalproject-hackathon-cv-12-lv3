@@ -8,7 +8,7 @@ from pathlib import Path
 from .table_ocr import TableOCR
 from .layout_analysis import LayoutAnalyzer, ElementType
 from .text_pipeline import Text_Extractor
-from .pdf2text_utils import select_device, box2list, add_edge_margin, expand_bbox_with_original, matching_captiong
+from .pdf2text_utils import select_device, box2list, add_edge_margin, expand_bbox_with_original, matching_captioning
 
 
 class Pdf2Text(object):
@@ -84,5 +84,22 @@ class Pdf2Text(object):
                 table_figure_outputs.append((crop_img, bbox, "Figure"))
             else:  # 나머지 타입은 처리하지않는 유형이므로 무시
                 pass
+
+        # unmatch_res
+        # 'caption' : 매칭되지 않은 caption , 'obj' : 매칭되지 않은 Figure or Table
+        # 하위 속성 'item' : text or obj, 'bbox' : bbox 값, 'type' : 해당 객체의 type
+
+        # match_res
+        # 'figure' : 매칭된 Figure와 caption, 'table' : 매칭된 Table과 caption
+        # 하위 속성
+        # "caption_number": caption_number,
+        # 'obj': obj,
+        # 'obj_bbox': obj_bbox,
+        # 'caption_bbox': caption_bbox,
+        # 'caption_text': caption_text
+        match_res, unmatch_res = matching_captioning(
+            caption_outputs, table_figure_outputs)
+
+        # TODO 분리해낸 Table, Figure를 어떤 방식으로 제공할 것인가?
 
         return " ".join(final_outputs)

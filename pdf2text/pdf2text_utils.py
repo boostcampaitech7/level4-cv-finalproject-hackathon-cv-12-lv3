@@ -452,17 +452,19 @@ def expand_bbox_with_original(image, bbox, horizontal_margin, vertical_margin):
     return (xmin, ymin, xmax, ymax)
 
 
-def matching_captiong(captions, objects, lang):
+def matching_captioning(captions, objects):
     # 위치기반 caption 매칭 로직
     matched_result = {'figure': [], 'table': []}
+    unmatched_result = {'obj': [], 'caption': []}
 
-    if lang not in ['korean', 'en']:
-        raise ValueError(
-            f"Unsupported language: {lang}. Supported languages are 'korean' and 'en'.")
-
+    idx = 0
     for caption_text, caption_bbox, caption_type in captions:
         caption_number = extract_caption_number(caption_text)
         if caption_number is None:
+            unmatched_result['caption'].append({"item": captions[idx][0],
+                                                "bbox": captions[idx][1],
+                                                'type': captions[idx][2]})
+            idx += 1
             continue
 
         matched_object = None
@@ -482,10 +484,22 @@ def matching_captiong(captions, objects, lang):
                     'caption_bbox': caption_bbox,
                     'caption_text': caption_text
                 }
+        if matched_object:
+            objects = [obj for obj in objects if obj[0]
+                       != matched_object['obj']]
+            matched_result[obj_type.lower()].append(matched_object)
+        else:
+            unmatched_result['caption'].append({"text": captions[idx][0],
+                                                "bbox": captions[idx][1],
+                                                'type': captions[idx][2]})
+        idx += 1
 
-        matched_result[obj_type.lower()].append(matched_object)
+    if len(objects) != 0:
+        unmatched_result['obj'] = [{"item": obj[0],
+                                    "bbox": obj[1],
+                                    "type": obj[2]} for obj in objects]
 
-    return matched_result
+    return matched_result, unmatched_result
 
 
 def extract_caption_number(caption_text):
@@ -497,5 +511,6 @@ def extract_caption_number(caption_text):
 
 
 def calculate_bbox_distance(bbox1, bbox2):
-    # ymin - ymin
-    return abs(bbox1[1] - bbox2[1])
+    x = abs(bbox1[0] - bbox2[0])
+    y = abs(bbox1[1] - bbox2[1])
+    return x + y
