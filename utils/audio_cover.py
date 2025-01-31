@@ -100,5 +100,5 @@ def generate_audiobook_cover(file_path):
     print("✅ Audiobook cover saved as 'audiobook_cover.png'")
     
 if __name__ == "__main__":
-    file_path = "/data/ephemeral/home/YJ/level4-cv-finalproject-hackathon-cv-12-lv3/utils/summary.txt"  # 읽어올 논문 요약 파일 경로
+    file_path = "summary.txt"  # 읽어올 논문 요약 파일 경로
     generate_audiobook_cover(file_path)
