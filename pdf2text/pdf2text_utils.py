@@ -4,14 +4,36 @@ import fitz
 import torch
 import numpy as np
 
+from pathlib import Path
+from fitz import Document, Page
+from typing import Optional, Union, Tuple, List
 from PIL import Image
 from collections import defaultdict
 from functools import cmp_to_key
 
 
-def divide_pdf_lang(page):
+def divide_pdf_lang(page: Union[Page]) -> str:
+    """
+    PDF 페이지의 주요 언어를 감지하여 'korean' 또는 'en'을 반환합니다.
+
+    Args:
+        page (Union[Page]): 분석할 PDF 페이지 객체.
+
+    Returns:
+        str: 'korean' 또는 'en' 중 하나.
+
+    예외:
+        TypeError : page 인자가 PyMuPDF의 Page 객체가 아닐 경우
+        ValueError : 페이지에서 텍스트를 추출할 수 없는 경우 발생.
+    """
+    if not isinstance(page, Page):
+        raise TypeError("page 인자는 PyMuPDF의 Page 객체여야 합니다.")
+
     # pdf의 첫 페이지로 판단
     total_text = page.get_text()
+
+    if total_text is None or total_text.strip() == "":
+        raise ValueError("페이지에서 텍스트를 추출할 수 없습니다.")
 
     korean_texts = len(re.findall(r'[\uac00-\ud7a3]', total_text))
     english_texts = len(re.findall(r'[a-zA-Z]', total_text))
@@ -20,13 +42,35 @@ def divide_pdf_lang(page):
     return "korean" if korean_texts >= english_texts else "en"
 
 
-def pdf_to_image(pdf_path):
+def pdf_to_image(pdf_path: Union[Document, str, Path]) -> Tuple[List[Image.Image], str]:
     """
-    PDF 파일을 이미지로 변환하는 함수
-    :param pdf_path: PDF 파일 경로
-    :return: 이미지 리스트(PIL Image 객체)
+    PDF 파일을 이미지로 변환하고, 첫 번째 페이지의 언어를 감지하는 함수.
+
+    Args:
+        pdf_path (Union[Document, str, Path]): 변환할 PDF 파일의 경로 또는 PyMuPDF의 Document 객체.
+
+    Returns:
+        Tuple[List[PIL.Image.Image], str]: 변환된 이미지 리스트와 감지된 언어 ('korean' 또는 'en').
+
+    예외:
+        FileNotFoundError: PDF 파일이 존재하지 않는 경우 발생.
+        ValueError: PDF가 비어 있거나 페이지를 읽을 수 없는 경우 발생.
+        TypeError: pdf_path의 타입이 잘못된 경우 발생.
     """
-    pages = fitz.open(pdf_path)
+
+    if isinstance(pdf_path, (str, Path)):
+        pdf_path = Path(pdf_path)
+        if not pdf_path.exists():
+            raise FileNotFoundError(f"PDF 파일을 찾을 수 없습니다: {pdf_path}")
+        pages = fitz.open(str(pdf_path))  # PyMuPDF는 Path 객체를 직접 받지 못함, str로 변환
+    elif isinstance(pdf_path, Document):
+        pages = pdf_path
+    else:
+        raise TypeError("pdf_path는 str, Path 또는 PyMuPDF의 Document 객체여야 합니다.")
+
+    if len(pages) == 0:
+        raise ValueError("PDF 파일이 비어 있습니다.")
+
     images = []
 
     lang = divide_pdf_lang(pages[0])
@@ -38,17 +82,53 @@ def pdf_to_image(pdf_path):
     return images, lang
 
 
-def select_device(device):
+def select_device(device: Optional[str] = None) -> str:
+    """
+    주어진 장치를 선택하거나 사용 가능한 경우 CUDA를 기본값으로 설정합니다.
+
+    Args:
+        device (Optional[str]): 사용할 장치. 'cuda', 'cpu' 또는 None을 입력할 수 있음.
+                                None이면 사용 가능한 최적의 장치를 자동으로 선택함.
+
+    Returns:
+        str: 선택된 장치 ('cuda' 또는 'cpu').
+
+    예외:
+        ValueError: 지원되지 않는 장치 문자열이 입력된 경우 발생.
+    """
+    valid_devices = {"cuda", "cpu", None}
+
+    if device not in valid_devices:
+        raise ValueError(f"지원되지 않는 장치입니다: {device}. 'cuda' 또는 'cpu'를 사용하세요.")
+
     if device is not None:
         return device
 
-    device = 'cpu'
-    if torch.cuda.is_available():
-        device = 'cuda'
-    return device
+    return "cuda" if torch.cuda.is_available() else "cpu"
 
 
-def check_box_area(box, min_h, min_w):
+def check_box_area(box: np.ndarray, min_h: int, min_w: int) -> bool:
+    """
+    주어진 박스가 최소 높이 및 너비 조건을 충족하는지 확인합니다.
+
+    Args:
+        box (np.ndarray): 4x2 형태의 좌표 배열. 각 행은 박스의 꼭짓점을 나타냅니다.
+        min_h (int): 최소 높이 기준.
+        min_w (int): 최소 너비 기준.
+
+    Returns:
+        bool: 박스가 조건을 충족하면 True, 그렇지 않으면 False.
+
+    예외:
+        ValueError: box의 크기가 올바르지 않을 경우 발생.
+        TypeError: 입력 타입이 잘못된 경우 발생.
+    """
+    if not isinstance(box, np.ndarray):
+        raise TypeError("box는 NumPy 배열이어야 합니다.")
+
+    if box.shape != (4, 2):
+        raise ValueError(f"box의 크기는 (4, 2)이어야 합니다. 현재 크기: {box.shape}")
+
     return (
         box[0, 0] + min_w <= box[1, 0]
         and box[1, 1] + min_h <= box[2, 1]
