@@ -467,7 +467,7 @@ def extract_cells_from_structure(table_structure):
             col_rect.include_rect(list(dilated_cols[col_idx]['bbox']))
 
         row_rect = Rect()
-        for row_idx in cell['col_indices']:
+        for row_idx in cell['row_indices']:
             row_rect.include_rect(list(dilated_rows[row_idx]['bbox']))
 
         # 최종 bbox 조정
