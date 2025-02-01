@@ -111,10 +111,35 @@ def save_new_json(page_number) :
     else :
         new_data = {}
 
+    if os.path.exists('formula.json') :
+        with open('formula.json', 'r') as f :
+            formula_data = json.load(f)
+    else :
+        formula_data = {}
+
     if str(page_number) not in existing_data :
         return False
 
     new_data[str(page_number)] = ' '.join(existing_data[str(page_number)])
+    
+    # 수식 부분 start, end 형태로 담아두기
+    lst = []
+    for idx, ch in enumerate(new_data[str(page_number)]) :
+        if ch == '{' and new_data[str(page_number)][idx+1] == 'v' :
+            end = idx
+            if new_data[str(page_number)][idx+3] == '}' :
+                end = idx+3
+            elif new_data[str(page_number)][idx+4] == '}' :
+                end = idx+4
+            lst.append((idx, end))
+
+    # 수식 부분 뒤에서 부터 처리해서 index 오류 방지하기
+    # 약간 비효율적일 수도 있을 것 같음
+    n = len(lst)
+    for idx, x in enumerate(lst[::-1]) :
+        s, e = x
+        temp = formula_data[str(page_number)][n-idx-1]
+        new_data[str(page_number)] = new_data[str(page_number)][:s] + temp + new_data[str(page_number)][e+1:]
 
     with open('new.json', 'w') as f:
         json.dump(new_data, f,ensure_ascii=False, indent=4)
