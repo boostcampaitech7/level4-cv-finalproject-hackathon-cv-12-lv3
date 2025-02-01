@@ -11,7 +11,7 @@ import io
 import requests
 from tqdm import tqdm
 from pydub import AudioSegment  # Import pydub for audio manipulation
-
+from script import write_full_script
 from http import HTTPStatus  # For better HTTP status code handling
 
 
@@ -87,55 +87,44 @@ def script_to_speech(conversations):
     final_audio = AudioSegment.empty()  # Initialize an empty AudioSegment
 
     for conversation in tqdm(conversations, desc="Generating podcast segments", unit="segment"):
-        speaker1_text = conversation["Alex"]
-        speaker2_text = conversation["Jamie"]
+        jaeseok_text = conversation.get("재석", "")
+        haha_text = conversation.get("하하", "")
 
-        audio1_segment = synthesize_text(speaker1_text, type="speaker1")
-        # audio1_segment = AudioSegment(audio1, sample_width=2, frame_rate=24000, channels=1)
-        audio1_segment = audio1_segment.fade_in(duration=100)
-        audio1_segment = audio1_segment.fade_out(duration=100)
+        # 재석의 대화 음성 생성
+        if jaeseok_text:
+            jaeseok_audio = synthesize_text(jaeseok_text, type="speaker1")
+            if not jaeseok_audio:
+                print(f"Error generating audio for 재석: {jaeseok_text}")
+                continue  # Skip to the next conversation
+            jaeseok_audio = jaeseok_audio.fade_in(duration=100).fade_out(duration=100)
+            final_audio += jaeseok_audio
 
-        final_audio += audio1_segment
-        if len(speaker2_text.strip()) > 0:
-            audio2_segment = synthesize_text(speaker2_text, type="speaker2")
-            # audio2_segment = AudioSegment(audio2, sample_width=2, frame_rate=24000, channels=1)
-            audio2_segment = audio2_segment.fade_in(duration=100)
-            audio2_segment = audio2_segment.fade_out(duration=100)
-
-            # Add a pause (e.g., 500 milliseconds = 0.5 seconds)
+        # 하하의 대화 음성 생성
+        if haha_text:
             pause = AudioSegment.silent(duration=200)
-            final_audio += pause  # Add the pause after speaker 1
-            final_audio += audio2_segment
+            final_audio += pause  # 대화 사이에 잠시 멈춤 추가
+            haha_audio = synthesize_text(haha_text, type="speaker2")
+            if not haha_audio:
+                print(f"Error generating audio for 하하: {haha_text}")
+                continue  # Skip to the next conversation
+            haha_audio = haha_audio.fade_in(duration=100).fade_out(duration=100)
+            final_audio += haha_audio
 
     return final_audio
 
 if __name__ == "__main__":
-    from pathlib import Path
-    file_path = Path('/Users/haneol/Documents/Coding/podcast_thanos.txt')
-    text = file_path.read_text()
+    try:
+        text_file_path = "/data/ephemeral/home/YJ/level4-cv-finalproject-hackathon-cv-12-lv3/summary.txt"
+        with open(text_file_path, "r", encoding="utf-8") as file:
+            text_content = file.read()
 
-    """Parses the input text into a list of conversation dictionaries."""
-    conversations = []
-    current_conversation = {"Alex": "", "Jamie": ""}
-    lines = text.strip().split('\n')
+        # 스크립트 생성
+        conversations = write_full_script(text_content)
 
-    for line in lines:
-        if line.startswith("Alex:"):
-            current_conversation["Alex"] = line[len("Alex:"):].strip()
-        elif line.startswith("Jamie:"):
-            current_conversation["Jamie"] = line[len("Jamie:"):].strip()
-            conversations.append(current_conversation)
-            current_conversation = {"Alex": "", "Jamie": ""}  # Start a new conversation
-        # Handle cases where a speaker has multiple consecutive lines
-        # elif current_conversation["Alex"] != "" and not line.startswith("Jamie:"):
-        #   current_conversation["Alex"] += " " + line.strip() #append new line to the existing one
-        # elif current_conversation["Jamie"] != "" and not line.startswith("Alex:"):
-        #   current_conversation["Jamie"] += " " + line.strip() #append new line to the existing one
+        # TTS를 이용해 음성 변환
+        final_audio = script_to_speech(conversations)
+        final_audio.export("output.mp3", format="mp3")
+        print("Podcast audio generated successfully as 'output.mp3'.")
 
-
-    # Add the last conversation if it's not empty
-    if current_conversation["Alex"] or current_conversation["Jamie"]:
-        conversations.append(current_conversation)
-
-    final_audio = script_to_speech(conversations)
-    final_audio.export("output.mp3", format="mp3")
+    except Exception as e:
+        print(f"Error occurred: {e}")
