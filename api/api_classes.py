@@ -20,7 +20,7 @@ class SegmentationAPI(BaseAPIExecutor):
         super().__init__(host, api_key, request_id)
         self._endpoint = API_CONFIG['segmentation_endpoint']
 
-    def get_segmentation(self, text, alpha=-100, seg_cnt=-1):
+    def get_segmentation(self, text, alpha=-1, seg_cnt=-1):
         payload = {
             "text": text,
             "alpha": alpha,
