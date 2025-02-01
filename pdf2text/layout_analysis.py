@@ -51,7 +51,6 @@ class LayoutAnalyzer:
     def __init__(self,
                  model_path,
                  device: str = None):
-        # TODO : Layout Analyzer Class
         self.device = select_device(device)
         self.idx2label = {
             0: "title",
@@ -68,7 +67,6 @@ class LayoutAnalyzer:
         self.model = YOLOv10(model_path).to(self.device)
 
     def parse(self, image, reshape_size=1024, confidence=0.2, iou_threshold=0.45):
-        # TODO : Layout Analysis 과정
         if isinstance(image, Image.Image):
             image = image.convert('RGB')
 

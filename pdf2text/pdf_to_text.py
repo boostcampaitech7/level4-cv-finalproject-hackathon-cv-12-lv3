@@ -10,6 +10,8 @@ from .layout_analysis import LayoutAnalyzer, ElementType
 from .text_pipeline import Text_Extractor
 from .pdf2text_utils import select_device, box2list, add_edge_margin, expand_bbox_with_original, matching_captioning
 
+# TODO 전반적인 예외처리 코드 작성하기
+
 
 class Pdf2Text(object):
     def __init__(self,
@@ -44,7 +46,6 @@ class Pdf2Text(object):
             crop_img = img.crop(bbox)
 
             if ele_type in (ElementType.TEXT, ElementType.TITLE, ElementType.PLAIN_TEXT):
-                # TODO TEXT OCR 이전의 전처리 코드 작성
                 # NOTE 배경 색상을 기준으로 margin 추가 기능
                 crop_img = add_edge_margin(crop_img, 20, 20)
 
@@ -61,7 +62,6 @@ class Pdf2Text(object):
                     final_outputs.append(text_ocr_output)
 
             elif ele_type == ElementType.FORMULA:
-                # TODO FORMULA OCR 이전의 전처리 코드 작성
                 # 여기로는 독립된 FORMULA만 입력으로 들어온다.
                 # NOTE 배경 색상을 기준으로 margin 추가 기능
                 crop_img = add_edge_margin(crop_img, 20, 20)
@@ -71,7 +71,6 @@ class Pdf2Text(object):
                 final_outputs.append(self.text_ocr.Recognize_Formula(crop_img))
 
             elif ele_type == ElementType.TABLE:
-                # TODO TABLE OCR 이전의 전처리 코드 작성
                 # NOTE TABLE은 정보가 잘리는 경우가 존재하기 때문에 기존 이미지에서 bbox 재조정
                 new_bbox = expand_bbox_with_original(img, bbox, 10, 10)
                 crop_img = img.crop(new_bbox)
