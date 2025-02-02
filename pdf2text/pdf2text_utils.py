@@ -357,11 +357,6 @@ def y_overlap(box1: Union[Dict[str, Union[np.ndarray, List[List[int]]]], List[Li
 
     Returns:
         float: Y축 방향 겹치는 비율 (0~1)
-
-    예외:
-        TypeError: 입력값이 리스트 또는 딕셔너리가 아닐 경우 발생.
-        KeyError: key가 존재하지 않을 경우 발생.
-        ValueError: 좌표의 형태가 올바르지 않을 경우 발생.
     """
     # Interaction / min(height1, height2)
 
@@ -387,12 +382,29 @@ def y_overlap(box1: Union[Dict[str, Union[np.ndarray, List[List[int]]]], List[Li
 
 
 def _compare_box(box1, box2, anchor, key, left_best: bool = True):
+    """
+    두 개의 박스를 비교하여 정렬 순서를 결정하는 함수.
+
+    Args:
+        box1 (dict): 첫 번째 박스.
+        box2 (dict): 두 번째 박스.
+        anchor (dict): 기준이 되는 앵커 박스.
+        key (str): 박스 좌표가 저장된 키.
+        left_best (bool): True이면 왼쪽 정렬을 우선, False이면 오른쪽 정렬을 우선.
+
+    Returns:
+        int: -1 (box1이 먼저), 1 (box2가 먼저), 또는 두 박스의 X 좌표 차이값.
+
+    예외:
+        KeyError: key가 박스에 존재하지 않을 경우 발생.
+        ValueError: 박스 좌표가 올바른 형태가 아닐 경우 발생.
+    """
     over1 = y_overlap(box1, anchor, key)
     over2 = y_overlap(box2, anchor, key)
     if box1[key][2, 0] < box2[key][0, 0] - 3:
-        return -1
+        return -1  # box1이 왼쪽으로 정렬
     elif box2[key][2, 0] < box1[key][0, 0] - 3:
-        return 1
+        return 1  # box2가 왼쪽으로 정렬
     else:
         if max(over1, over2) >= 3 * min(over1, over2):
             return over2 - over1 if left_best else over1 - over2
@@ -400,13 +412,38 @@ def _compare_box(box1, box2, anchor, key, left_best: bool = True):
 
 
 def merge_line_texts(
-    outs,
+    outs: List[Dict[str, Union[str, np.ndarray, int]]],
     auto_line_break: bool = True,
     line_sep='\n',
     embed_sep=(' $', '$ '),
     isolated_sep=('$$\n', '\n$$'),
     spellchecker=None,
 ) -> str:
+    """
+    OCR 또는 문서 레이아웃 분석 결과를 기반으로 텍스트를 줄 단위로 병합합니다.
+
+    Args:
+        outs (List[Dict[str, Union[str, np.ndarray, int]]]): 
+            OCR 결과 또는 텍스트 분석 결과 리스트.
+            - 'text' (str): 감지된 텍스트.
+            - 'position' (np.ndarray): 텍스트의 좌표 (4x2 배열).
+            - 'type' (str, optional): 'text', 'embedding', 'isolated' 중 하나.
+            - 'line_number' (int, optional): 줄 번호.
+        auto_line_break (bool, optional): 
+            자동 줄바꿈을 적용할지 여부 (기본값: True).
+        line_sep (str, optional): 
+            줄 구분자 (기본값: '\n').
+        embed_sep (tuple, optional): 
+            수식 또는 임베딩 텍스트 감싸는 구분자 (기본값: (' $', '$ ')).
+        isolated_sep (tuple, optional): 
+            독립된 수식 감싸는 구분자 (기본값: ('$$\n', '\n$$')).
+        spellchecker (optional): 
+            맞춤법 검사기 함수 (기본값: None).
+
+    Returns:
+        str: 병합된 텍스트.
+    """
+
     if not outs:
         return ''
 
@@ -416,6 +453,7 @@ def merge_line_texts(
     line_height_dict = defaultdict(list)
     line_ymin_ymax_list = []
 
+    # 줄 단위 텍스트 분류
     for _out in outs:
         line_number = _out.get('line_number', 0)
         while len(out_texts) <= line_number:
@@ -428,6 +466,7 @@ def merge_line_texts(
         cur_type = _out.get('type', 'text')
         box = _out['position']
 
+        # 수식 또는 임베딩 텍스트의 구분자 추가
         if cur_type in ('embedding', 'isolated'):
             sep = isolated_sep if _out['type'] == 'isolated' else embed_sep
             cur_text = sep[0] + cur_text + sep[1]
@@ -438,6 +477,7 @@ def merge_line_texts(
 
         out_texts[line_number].append(cur_text)
 
+        # line의 마진 정보 업데이트
         line_margin_list[line_number][1] = max(
             line_margin_list[line_number][1], float(box[2, 0])
         )
@@ -445,6 +485,7 @@ def merge_line_texts(
             line_margin_list[line_number][0], float(box[0, 0])
         )
 
+        # 일반 텍스트의 높이 정보 저장
         if cur_type == 'text':
             line_height_dict[line_number].append(box[2, 1] - box[1, 1])
             line_ymin_ymax_list[line_number][0] = min(
@@ -454,8 +495,10 @@ def merge_line_texts(
                 line_ymin_ymax_list[line_number][1], float(box[2, 1])
             )
 
+    # line text 병합
     line_text_list = [smart_join(o) for o in out_texts]
 
+    # 평균 line height 계산
     for _line_number in line_height_dict.keys():
         if line_height_dict[_line_number]:
             line_height_dict[_line_number] = np.mean(
@@ -470,12 +513,14 @@ def merge_line_texts(
     if not auto_line_break:
         return default_res
 
+    # 줄 길이 기반으로 자동 줄바꿈 결정
     line_lengths = [rx - lx for lx, rx in line_margin_list]
     line_length_thrsh = max(line_lengths) * 0.3
 
     if line_length_thrsh < 1:
         return default_res
 
+    # 주요 라인 좌표 필터링
     lines = np.array(
         [
             margin
@@ -494,6 +539,7 @@ def merge_line_texts(
 
     min_x, max_x = cal_block_xmin_xmax(lines, indentation_thrsh)
 
+    # 최종 line text 조정
     res_line_texts = [''] * len(line_text_list)
     line_text_list = [(idx, txt)
                       for idx, txt in enumerate(line_text_list) if txt]
@@ -525,22 +571,34 @@ def merge_line_texts(
     return re.sub(rf'{line_sep}+', line_sep, outs)
 
 
-def smart_join(str_list, spellchecker=None):
+def smart_join(str_list: List[str], spellchecker=None):
+    """
+    문자열 리스트를 공백 처리 및 맞춤법 검사 로직을 적용하여 하나의 문자열로 병합합니다.
+
+    Args:
+        str_list (List[str]): 병합할 문자열 리스트.
+        spellchecker (optional): 맞춤법 검사기 객체 (기본값: None).
+
+    Returns:
+        str: 병합된 문자열.
+    """
     def contain_whitespace(s):
+        """ 문자열 공백 문자 포함 확인 """
         if re.search(r'\s', s):
             return True
         else:
             return False
 
-    str_list = [s for s in str_list if s]
+    str_list = [s for s in str_list if s]   # 빈 문자열 제거
     if not str_list:
         return ''
+
     res = str_list[0]
     for i in range(1, len(str_list)):
-        if (is_chinese(res[-1]) and is_chinese(str_list[i][0])) or contain_whitespace(
-            res[-1] + str_list[i][0]
-        ):
+        # 마지막 문자와 이후 문자열의 시작 문자가 공백이면 그대로 병합
+        if contain_whitespace(res[-1] + str_list[i][0]):
             res += str_list[i]
+        # spellchecker를 위한 처리
         elif spellchecker is not None and res.endswith('-'):
             fields = res.rsplit(' ', maxsplit=1)
             if len(fields) > 1:
@@ -567,47 +625,97 @@ def smart_join(str_list, spellchecker=None):
             else:
                 new_word = prev_word + next_word
                 res = new_res + ' ' + new_word + new_next
-        else:
+        else:  # 공백 추가 후 병합
             res += ' ' + str_list[i]
     return res
 
 
-def is_chinese(ch):
-    return '\u4e00' <= ch <= '\u9fff'
+def find_first_punctuation_position(text: str):
+    """
+    주어진 문자열에서 첫 번째 구두점(문장 부호)의 위치를 찾습니다.
+
+    Args:
+        text (str): 검색할 문자열.
+
+    Returns:
+        int: 첫 번째 구두점의 인덱스. 구두점이 없으면 문자열 길이를 반환.
+    """
+    pattern = re.compile(r'[,.!?;:()\[\]{}\'\"\\/-]')  # 패턴 정의
+    match = pattern.search(text)  # 매칭되는 패턴 서치
+    return match.start() if match else len(text)  # 있으면 첫 번째 구두점 반환
 
 
-def find_first_punctuation_position(text):
-    pattern = re.compile(r'[,.!?;:()\[\]{}\'\"\\/-]')
-    match = pattern.search(text)
-    if match:
-        return match.start()
-    else:
-        return len(text)
+def cal_block_xmin_xmax(lines: np.ndarray, indentation_thrsh: float):
+    """
+    텍스트 블록의 최소 및 최대 X 좌표를 계산합니다.
 
+    Args:
+        lines (np.ndarray): 텍스트 블록의 각 라인의 X 좌표 배열. (N, 2) 형태이며, 
+                            각 행은 [line_min_x, line_max_x]로 구성됨.
+        indentation_thrsh (float): 들여쓰기 임계값.
 
-def cal_block_xmin_xmax(lines, indentation_thrsh):
+    Returns:
+        tuple: (min_x, max_x) - 블록의 최소 및 최대 X 좌표.
+    """
     total_min_x, total_max_x = min(lines[:, 0]), max(lines[:, 1])
+
+    # line이 하나면 그대로 반환
     if lines.shape[0] < 2:
         return total_min_x, total_max_x
 
+    # 첫 번째 라인을 제외한 최소 및 최대 X값 계산
     min_x, max_x = min(lines[1:, 0]), max(lines[1:, 1])
+
+    # 첫 번째 라인이 전체 블록을 포함하는지 체크
     first_line_is_full = total_max_x > max_x - indentation_thrsh
+
     if first_line_is_full:
         return min_x, total_max_x
 
     return total_min_x, total_max_x
 
 
-def clipbox(box, img_height, img_width):
+def clipbox(box: np.ndarray, img_height: int, img_width: int):
+    """
+    박스 좌표를 이미지 범위 내로 클리핑합니다.
+
+    Args:
+        box (np.ndarray): (N, 2) 형태의 배열로, 각 행이 [x, y] 좌표를 나타냄.
+        img_height (int): 이미지의 높이 (Y축 최대값).
+        img_width (int): 이미지의 너비 (X축 최대값).
+
+    Returns:
+        np.ndarray: 이미지 범위를 벗어나지 않는 조정된 박스 좌표.
+    """
     new_box = np.zeros_like(box)
     new_box[:, 0] = np.clip(box[:, 0], 0, img_width - 1)
     new_box[:, 1] = np.clip(box[:, 1], 0, img_height - 1)
     return new_box
 
 
-def add_edge_margin(image, horizontal_margin, vertical_margin):
+def add_edge_margin(image: Union[Image.Image, np.ndarray], horizontal_margin: int, vertical_margin: int):
+    """
+    입력된 이미지에 지정된 수평 및 수직 마진을 추가하여 새로운 이미지를 생성합니다.
+
+    Args:
+        image (PIL.Image or np.ndarray): 마진을 추가할 원본 이미지.
+            - `PIL.Image`: PIL 이미지 객체.
+            - `np.ndarray`: NumPy 배열 형식의 이미지 (3D 배열, shape: (height, width, channels)).
+        horizontal_margin (int): 이미지 양쪽에 추가할 수평 마진의 크기.
+        vertical_margin (int): 이미지 상하에 추가할 수직 마진의 크기.
+
+    Returns:
+        PIL.Image: 수평 및 수직 마진이 추가된 새로운 이미지.
+    """
     # 입력된 margin을 양쪽에 추가해주는 기능
     # 일반적으로 Text에 사용됨.
+    if isinstance(image, (Image.Image, np.ndarray)):
+        if isinstance(image, np.ndarray):
+            image = Image.fromarray(image)
+    else:
+        raise TypeError(
+            f"Invalid Input Type : Expected an instance of Image.Image or np.ndarray, but received {type(image)}")
+
     bg_color = get_section_color(image)
 
     w, h = image.size
@@ -621,7 +729,19 @@ def add_edge_margin(image, horizontal_margin, vertical_margin):
     return new_image
 
 
-def get_section_color(image, limit=2):
+def get_section_color(image: Image.Image, limit: int = 2):
+    """
+    이미지의 외곽(주어진 `limit` 범위 내) 픽셀 중 가장 많이 등장한 색상을 반환합니다.
+    주로 배경색 추정을 위해 사용됩니다.
+
+    Args:
+        image (PIL.Image): 색상을 추출할 이미지.
+            - `PIL.Image`: PIL 이미지 객체.
+        limit (int, optional): 이미지 외곽을 구할 때의 범위 한계. 기본값은 2.
+
+    Returns:
+        tuple: 가장 많이 등장한 색상의 RGB 값.
+    """
     from collections import Counter
     w, h = image.size
 
@@ -631,7 +751,22 @@ def get_section_color(image, limit=2):
     return Counter(pixels).most_common(1)[0][0]
 
 
-def expand_bbox_with_original(image, bbox, horizontal_margin, vertical_margin):
+def expand_bbox_with_original(image: Image.Image, bbox: List[int], horizontal_margin: int, vertical_margin: int):
+    """
+    주어진 bounding box를 수평 및 수직 마진만큼 확장하고, 확장된 영역이 이미지 크기를 벗어나지 않도록 제한합니다.
+
+    Args:
+        image (PIL.Image): bounding box가 적용될 원본 이미지.
+        bbox (List[int]): 원본 bounding box (xmin, ymin, xmax, ymax).
+            - xmin, ymin: 좌상단 좌표.
+            - xmax, ymax: 우하단 좌표.
+        horizontal_margin (int): 수평 마진(픽셀 단위)로 bounding box를 확장할 값.
+        vertical_margin (int): 수직 마진(픽셀 단위)으로 bounding box를 확장할 값.
+
+    Returns:
+        tuple: 확장된 bounding box의 좌표 (xmin, ymin, xmax, ymax).
+            - 확장된 좌표는 이미지 크기를 벗어나지 않도록 제한됨.
+    """
     w, h = image.size
 
     xmin, ymin, xmax, ymax = bbox
@@ -645,7 +780,22 @@ def expand_bbox_with_original(image, bbox, horizontal_margin, vertical_margin):
     return (xmin, ymin, xmax, ymax)
 
 
-def matching_captioning(captions, objects):
+def matching_captioning(captions: List[Tuple[str, List[int], str]],
+                        objects: List[Tuple[Union[Image.Image, str], List[int], str]]):
+    """
+    캡션과 객체의 위치를 기반으로 캡션과 객체를 매칭하는 함수.
+
+    Args:
+        captions (List[Tuple[str, List[int], str]]): 캡션과 그에 해당하는 bounding box, 타입을 포함한 리스트.
+            각 항목은 (caption_text, caption_bbox, caption_type) 형식입니다.
+        objects (List[Tuple[Union[Image.Image, str], List[int], str]]): 객체와 그에 해당하는 bounding box, 타입을 포함한 리스트.
+            각 항목은 (obj, obj_bbox, obj_type) 형식입니다.
+
+    Returns:
+        tuple: 두 개의 딕셔너리를 반환합니다.
+            - matched_result: 매칭된 캡션과 객체를 'figure'와 'table'에 따라 분류하여 반환.
+            - unmatched_result: 매칭되지 않은 캡션과 객체를 'caption'과 'obj'에 따라 반환.
+    """
     # 위치기반 caption 매칭 로직
     matched_result = {'figure': [], 'table': []}
     unmatched_result = {'obj': [], 'caption': []}
@@ -695,15 +845,32 @@ def matching_captioning(captions, objects):
     return matched_result, unmatched_result
 
 
-def extract_caption_number(caption_text):
+def extract_caption_number(caption_text: str) -> Optional[str]:
+    """
+    캡션 텍스트에서 숫자를 추출하여 캡션 번호를 반환합니다.
+
+    Args:
+        caption_text (str): 캡션 텍스트.
+
+    Returns:
+        str or None: 추출된 캡션 번호 또는 숫자가 없으면 None.
+    """
     # caption이 몇 번을 나타내는지 확인
     result = re.search(r"(\d+)", caption_text)
-    if result:
-        return result.group()
-    return None
+    return result.group() if result else None
 
 
-def calculate_bbox_distance(bbox1, bbox2):
+def calculate_bbox_distance(bbox1: List[int], bbox2: List[int]) -> int:
+    """
+    두 bounding box 간의 거리(차이)를 계산합니다.
+
+    Args:
+        bbox1 (List[int]): 첫 번째 bounding box (xmin, ymin, xmax, ymax).
+        bbox2 (List[int]): 두 번째 bounding box (xmin, ymin, xmax, ymax).
+
+    Returns:
+        int: 두 bounding box 간의 x 및 y 좌표 차이의 합.
+    """
     x = abs(bbox1[0] - bbox2[0])
     y = abs(bbox1[1] - bbox2[1])
     return x + y
