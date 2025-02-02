@@ -1,9 +1,9 @@
-import re
 import cv2
 import numpy as np
 
 from PIL import Image
 from pathlib import Path
+from fitz import Rect
 
 from .table_ocr import TableOCR
 from .layout_analysis import LayoutAnalyzer, ElementType
@@ -98,6 +98,15 @@ class Pdf2Text(object):
         # 'caption_text': caption_text
         match_res, unmatch_res = matching_captioning(
             caption_outputs, table_figure_outputs)
+
+        # for key in match_res:
+        #     for obj in match_res[key]:
+        #         path = f"{key}_{obj['caption_number']}.png"
+        #         rect = Rect(obj['obj_bbox']).include_rect(
+        #             Rect(obj['caption_bbox']))
+        #         bb = (rect.top_left[0], rect.top_left[1],
+        #               rect.bottom_right[0], rect.bottom_right[1])
+        #         img.crop(bb).save(path, "png")
 
         # TODO 분리해낸 Table, Figure를 어떤 방식으로 제공할 것인가?
 

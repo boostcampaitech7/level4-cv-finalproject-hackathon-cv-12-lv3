@@ -6,7 +6,7 @@ import numpy as np
 
 from pathlib import Path
 from fitz import Document, Page
-from typing import Optional, Union, Tuple, List
+from typing import Optional, Union, Tuple, List, Dict, Any
 from PIL import Image
 from collections import defaultdict
 from functools import cmp_to_key
@@ -36,6 +36,7 @@ def divide_pdf_lang(page: Union[Page]) -> str:
         raise ValueError("페이지에서 텍스트를 추출할 수 없습니다.")
 
     korean_texts = len(re.findall(r'[\uac00-\ud7a3]', total_text))
+    # TODO 한국어가 한 글자라도 있으면 korean으로 반환
     english_texts = len(re.findall(r'[a-zA-Z]', total_text))
 
     # 길이로 판단
@@ -137,21 +138,91 @@ def check_box_area(box: np.ndarray, min_h: int, min_w: int) -> bool:
     )
 
 
-def box2list(bbox):
+def box2list(bbox: np.ndarray) -> list:
+    """
+    4x2 형태의 NumPy 배열(Bounding Box)을 리스트 [xmin, ymin, xmax, ymax] 형식으로 변환합니다.
+
+    Args:
+        bbox (np.ndarray): 4x2 형태의 좌표 배열.
+
+    Returns:
+        list: [xmin, ymin, xmax, ymax] 형식의 리스트.
+
+    예외:
+        TypeError: bbox가 NumPy 배열이 아닐 경우 발생.
+        ValueError: bbox의 크기가 올바르지 않을 경우 발생.
+    """
+    if not isinstance(bbox, np.ndarray):
+        raise TypeError("bbox는 NumPy 배열이어야 합니다.")
+
+    if bbox.shape != (4, 2):
+        raise ValueError(f"bbox의 크기는 (4, 2)이어야 합니다. 현재 크기: {bbox.shape}")
+
     return [int(bbox[0, 0]), int(bbox[0, 1]), int(bbox[2, 0]), int(bbox[2, 1])]
 
 
-def list2box(xmin, ymin, xmax, ymax):
+def list2box(xmin: Union[int, float], ymin: Union[int, float], xmax: Union[int, float], ymax: Union[int, float]) -> np.ndarray:
+    """
+    [xmin, ymin, xmax, ymax] 형태의 리스트를 4x2 NumPy 배열(Bounding Box)로 변환합니다.
+
+    Args:
+        xmin (Union[int, float]): 박스의 최소 x 좌표.
+        ymin (Union[int, float]): 박스의 최소 y 좌표.
+        xmax (Union[int, float]): 박스의 최대 x 좌표.
+        ymax (Union[int, float]): 박스의 최대 y 좌표.
+
+    Returns:
+        np.ndarray: 4x2 형태의 좌표 배열.
+
+    예외:
+        TypeError: 입력값이 정수가 아닐 경우 발생.
+        ValueError: xmax 또는 ymax가 xmin 또는 ymin보다 작은 경우 발생.
+    """
+    try:
+        xmin, ymin, xmax, ymax = map(int, [xmin, ymin, xmax, ymax])
+    except ValueError:
+        raise TypeError("xmin, ymin, xmax, ymax는 모두 숫자여야 합니다.")
+
     return np.array([[xmin, ymin], [xmax, ymin], [xmax, ymax], [xmin, ymax]])
 
 
-def sort_boxes(boxes, key):
+def sort_boxes(boxes: List[Dict[str, Any]], key: str) -> List[List[Dict[str, Any]]]:
+    """
+    주어진 박스 리스트를 정렬하고, 라인별로 그룹화합니다.
+
+    Args:
+        boxes (List[Dict[str, Any]]): 정렬할 박스들의 리스트. 각 박스는 딕셔너리로 표현되며, 
+                                      key에 해당하는 값이 4x2 NumPy 배열이어야 합니다.
+        key (str): 박스 좌표를 찾을 딕셔너리 키.
+
+    Returns:
+        List[List[Dict[str, Any]]]: 라인별로 정렬된 박스 그룹 리스트.
+
+    예외:
+        TypeError: boxes가 리스트가 아닐 경우 발생.
+        ValueError: boxes 내부 요소가 올바른 형식이 아닐 경우 발생.
+        KeyError: key가 박스 딕셔너리에 없을 경우 발생.
+    """
+    if not isinstance(boxes, list):
+        raise TypeError("boxes는 리스트여야 합니다.")
+
+    for box in boxes:
+        if not isinstance(box, dict):
+            raise ValueError("boxes 내부 요소는 딕셔너리여야 합니다.")
+        if key not in box:
+            raise KeyError(f"'{key}' 키가 박스 데이터에 존재하지 않습니다.")
+        if not isinstance(box[key], np.ndarray) or box[key].shape != (4, 2):
+            raise ValueError(f"'{key}' 키의 값은 (4,2) 크기의 NumPy 배열이어야 합니다.")
+
+    # y축 기준 정렬
     boxes.sort(key=lambda x: x[key][0, 1])
 
+    # 모든 박스의 line_number 초기화
     for box in boxes:
         box['line_number'] = -1
 
     def get_anchor():
+        """ 아직 할당되지 않은 박스를 반환 """
         anchor = None
         for box in boxes:
             if box['line_number'] == -1:
@@ -172,7 +243,17 @@ def sort_boxes(boxes, key):
     return lines
 
 
-def get_same_line_boxes(anchor, total_boxes):
+def get_same_line_boxes(anchor: Dict[str, Any], total_boxes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    기준 박스를 중심으로 동일한 라인에 속하는 박스를 찾습니다.
+
+    Args:
+        anchor (Dict[str, Any]): 기준 박스.
+        total_boxes (List[Dict[str, Any]]): 전체 박스 리스트.
+
+    Returns:
+        List[Dict[str, Any]]: 동일한 라인에 속하는 박스 리스트.
+    """
     line_boxes = [anchor]
     for box in total_boxes:
         if box['line_number'] >= 0:
@@ -182,13 +263,24 @@ def get_same_line_boxes(anchor, total_boxes):
     return line_boxes
 
 
-def sort_and_filter_line_boxes(line_boxes, key):
+def sort_and_filter_line_boxes(line_boxes: List[Dict[str, Any]], key: str) -> List[Dict[str, Any]]:
+    """
+    주어진 라인 내 박스를 정렬하고, 좌우 관계를 고려하여 필터링합니다.
+
+    Args:
+        line_boxes (List[Dict[str, Any]]): 정렬할 라인의 박스 리스트.
+        key (str): 박스 좌표를 찾을 딕셔너리 키.
+
+    Returns:
+        List[Dict[str, Any]]: 정렬된 박스 리스트.
+    """
     if len(line_boxes) <= 1:
         return line_boxes
 
     allowed_max_overlay_x = 20
 
     def find_right_box(anchor):
+        """기준 박스의 오른쪽에 위치한 박스를 찾음"""
         anchor_width = anchor[key][2, 0] - anchor[key][0, 0]
         allowed_max = min(
             max(allowed_max_overlay_x, anchor_width * 0.5), anchor_width * 0.95
@@ -201,15 +293,15 @@ def sort_and_filter_line_boxes(line_boxes, key):
         ]
         if not right_boxes:
             return None
-        right_boxes = sorted(
+
+        return sorted(
             right_boxes,
-            key=cmp_to_key(
-                lambda x, y: _compare_box(x, y, anchor, key, left_best=True)
-            ),
-        )
-        return right_boxes[0]
+            key=cmp_to_key(lambda x, y: _compare_box(
+                x, y, anchor, key, left_best=True))
+        )[0]
 
     def find_left_box(anchor):
+        """기준 박스의 왼쪽에 위치한 박스를 찾음"""
         anchor_width = anchor[key][2, 0] - anchor[key][0, 0]
         allowed_max = min(
             max(allowed_max_overlay_x, anchor_width * 0.5), anchor_width * 0.95
@@ -222,13 +314,11 @@ def sort_and_filter_line_boxes(line_boxes, key):
         ]
         if not left_boxes:
             return None
-        left_boxes = sorted(
+        return sorted(
             left_boxes,
-            key=cmp_to_key(
-                lambda x, y: _compare_box(x, y, anchor, key, left_best=False)
-            ),
-        )
-        return left_boxes[-1]
+            key=cmp_to_key(lambda x, y: _compare_box(
+                x, y, anchor, key, left_best=False))
+        )[-1]
 
     res_boxes = [line_boxes[0]]
     anchor = res_boxes[0]
@@ -254,8 +344,31 @@ def sort_and_filter_line_boxes(line_boxes, key):
     return res_boxes
 
 
-def y_overlap(box1, box2, key='position'):
+def y_overlap(box1: Union[Dict[str, Union[np.ndarray, List[List[int]]]], List[List[int]]],
+              box2: Union[Dict[str, Union[np.ndarray, List[List[int]]]], List[List[int]]],
+              key: str = 'position') -> float:
+    """
+    두 박스의 Y축 방향 겹치는 비율을 계산합니다.
+
+    Args:
+        box1 (Union[Dict[str, Union[np.ndarray, List[List[int]]]], List[List[int]]]): 첫 번째 박스 좌표 (딕셔너리 또는 리스트)
+        box2 (Union[Dict[str, Union[np.ndarray, List[List[int]]]], List[List[int]]]): 두 번째 박스 좌표 (딕셔너리 또는 리스트)
+        key (str): 박스가 딕셔너리일 경우, 좌표가 저장된 키 (기본값: 'position')
+
+    Returns:
+        float: Y축 방향 겹치는 비율 (0~1)
+
+    예외:
+        TypeError: 입력값이 리스트 또는 딕셔너리가 아닐 경우 발생.
+        KeyError: key가 존재하지 않을 경우 발생.
+        ValueError: 좌표의 형태가 올바르지 않을 경우 발생.
+    """
     # Interaction / min(height1, height2)
+
+    # bbox 타입 검사
+    if not isinstance(box1, (dict, list)) or not isinstance(box2, (dict, list)):
+        raise TypeError("box1과 box2는 리스트 또는 딕셔너리여야 합니다.")
+
     if key:
         box1 = [box1[key][0][0], box1[key][0][1],
                 box1[key][2][0], box1[key][2][1]]
