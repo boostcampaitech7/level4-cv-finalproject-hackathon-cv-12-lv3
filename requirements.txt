@@ -16,6 +16,8 @@ tools
 python-dotenv
 timm
 paddleocr
+einops
+ninja
 networkx
 scikit-learn
 bert-extractive-summarizer
