@@ -167,7 +167,7 @@ def abstractive_summarization(extracted_sentences, completion_executor):
     
     res1 = res1['message']['content']
     res2 = res2['message']['content']
-    return res1 + res2
+    return res1 + "\n" + res2
 
 
 # def extractive_summarization(preprocessed_text, lang):
