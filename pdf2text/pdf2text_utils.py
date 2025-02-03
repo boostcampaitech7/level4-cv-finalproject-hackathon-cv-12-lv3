@@ -36,11 +36,10 @@ def divide_pdf_lang(page: Union[Page]) -> str:
         raise ValueError("페이지에서 텍스트를 추출할 수 없습니다.")
 
     korean_texts = len(re.findall(r'[\uac00-\ud7a3]', total_text))
-    # TODO 한국어가 한 글자라도 있으면 korean으로 반환
-    english_texts = len(re.findall(r'[a-zA-Z]', total_text))
+    # english_texts = len(re.findall(r'[a-zA-Z]', total_text))
 
     # 길이로 판단
-    return "korean" if korean_texts >= english_texts else "en"
+    return "korean" if korean_texts else "en"
 
 
 def pdf_to_image(pdf_path: Union[Document, str, Path]) -> Tuple[List[Image.Image], str]:

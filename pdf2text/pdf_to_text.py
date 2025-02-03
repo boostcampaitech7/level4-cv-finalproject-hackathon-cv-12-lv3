@@ -10,8 +10,6 @@ from .layout_analysis import LayoutAnalyzer, ElementType
 from .text_pipeline import Text_Extractor
 from .pdf2text_utils import select_device, box2list, add_edge_margin, expand_bbox_with_original, matching_captioning
 
-# TODO 전반적인 예외처리 코드 작성하기
-
 
 class Pdf2Text(object):
     def __init__(self,
@@ -128,6 +126,7 @@ class Pdf2Text(object):
         #                     path + f"/{obj['type']}_{idx}.png", 'png')
         #             else:
         #                 print(obj['item'])
+
         # TODO 분리해낸 Table, Figure를 어떤 방식으로 제공할 것인가?
 
         return " ".join(final_outputs)
