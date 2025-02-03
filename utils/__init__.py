@@ -8,5 +8,5 @@ from .summary_short import extractive_summarization,abstractive_summarization
 from .extract_paper import extract_paper_metadata
 
 __all__ = ['images_to_text', 'clean_text', 'chunkify_with_overlap', 'query_and_respond',
-           'MultiChatManager', 'llm_refine', 'query_and_respond_reranker_compare','extractive_summarization'
-           ,'split_sentences','abstractive_summarization', 'process_query_with_reranking_compare', 'extract_paper_metadata', 'group_academic_paragraphs']
+           'MultiChatManager', 'llm_refine', 'query_and_respond_reranker_compare','extractive_summarization',
+           'split_sentences','abstractive_summarization', 'group_academic_paragraphs', 'process_query_with_reranking_compare', 'extract_paper_metadata']

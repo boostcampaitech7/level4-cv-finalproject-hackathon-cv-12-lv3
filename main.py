@@ -3,7 +3,7 @@ import argparse,re
 from tqdm import tqdm
 from config.config import AI_CONFIG, API_CONFIG
 from utils import images_to_text, clean_text, chunkify_with_overlap, query_and_respond, MultiChatManager, abstractive_summarization
-from utils import llm_refine, query_and_respond_reranker_compare, semantic_chunking, extractive_summarization, split_sentences, group_academic_paragraphs, extract_paper_metadata
+from utils import llm_refine, process_query_with_reranking_compare, semantic_chunking, extractive_summarization, split_sentences, extract_paper_metadata, group_academic_paragraphs
 from api import EmbeddingAPI, ChatCompletionsExecutor, SummarizationExecutor
 from datebase import DatabaseConnection, DocumentUploader, SessionManager, PaperManager, ChatHistoryManager
 from pdf2text import Pdf2Text, pdf_to_image
