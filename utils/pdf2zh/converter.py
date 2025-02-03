@@ -28,7 +28,7 @@ log = logging.getLogger(__name__)
 
 from pdfminer.layout import LTPage, LTChar, LTFigure
 import os
-
+import json
 
 
 class PDFConverterEx(PDFConverter):
@@ -112,6 +112,26 @@ class Paragraph:
         self.size: float = size  # 글자 크기
         self.brk: bool = brk  # 줄 바꿈 여부
 
+def save_formulas_to_json(page_number, formulas):
+    """
+    페이지 번호와 수식 텍스트를 JSON 파일로 저장합니다.
+    """
+    if os.path.exists('formula.json'):
+        with open('formula.json', 'r') as f:
+            existing_data = json.load(f)
+    else:
+        existing_data = {}
+
+    # 페이지 번호를 키로 사용하여 데이터 추가
+    if str(page_number) not in existing_data:
+        existing_data[str(page_number)] = []
+
+    # 수식 텍스트 추가
+    existing_data[str(page_number)].extend(formulas)
+
+    # JSON 파일로 저장
+    with open('formula.json', 'w') as f:
+        json.dump(existing_data, f,ensure_ascii=False, indent=4)
 
 # fmt: off
 class TranslateConverter(PDFConverterEx):
@@ -318,10 +338,16 @@ class TranslateConverter(PDFConverterEx):
             varf.append(vfix)
         log.debug("\n==========[VSTACK]==========\n")
 
+        formulas = []
         for id, v in enumerate(var):  # 수식 너비 계산
             l = max([vch.x1 for vch in v]) - v[0].x0
             log.debug(f'< {l:.1f} {v[0].x0:.1f} {v[0].y0:.1f} {v[0].cid} {v[0].fontname} {len(varl[id])} > v{id} = {"".join([ch.get_text() for ch in v])}')
             vlen.append(l)
+            formula_text = "".join([ch.get_text() for ch in v])
+            formulas.append(formula_text)
+
+        # JSON 파일로 저장
+        save_formulas_to_json(ltpage.pageid, formulas)
 
         ############################################################
         # B. 단락 번역
@@ -385,8 +411,26 @@ class TranslateConverter(PDFConverterEx):
             tx = x
             fcur_ = fcur
             ptr = 0
-            log.debug(f"< {y} {x} {x0} {x1} {size} {brk} > {sstk[id]} | {new}")
 
+            # ssdk -> 원본 저장
+            log.debug(f"< {y} {x} {x0} {x1} {size} {brk} > {sstk[id]} | {new}")
+            
+            json_file_path = 'original.json'
+            if os.path.exists(json_file_path):
+                with open(json_file_path, 'r') as f:
+                    existing_data = json.load(f)
+            else:
+                existing_data = {}
+
+            page_number = ltpage.pageid  # 현재 페이지 번호
+            if str(page_number) not in existing_data:
+                existing_data[str(page_number)] = []  # 새로운 페이지 번호를 키로 추가
+
+            existing_data[str(page_number)].append(sstk[id])
+
+            # 업데이트된 데이터를 JSON 파일에 저장합니다.
+            with open(json_file_path, 'w') as f:
+                json.dump(existing_data, f, indent=4)  # indent는 가독성을 위해 추가
             ops_vals: list[dict] = []
 
             while ptr < len(new):
@@ -503,7 +547,6 @@ class TranslateConverter(PDFConverterEx):
                     ops_list.append(gen_op_txt(vals["font"], vals["size"], vals["x"], vals["dy"] + y - vals["lidx"] * size * line_height, vals["rtxt"]))
                 elif vals["type"] == OpType.LINE:
                     ops_list.append(gen_op_line(vals["x"], vals["dy"] + y - vals["lidx"] * size * line_height, vals["xlen"], vals["ylen"], vals["linewidth"]))
-
         for l in lstk:  # 전역 선 레이아웃
             if l.linewidth < 5:  # hack 일부 문서는 굵은 선을 배경으로 사용
                 ops_list.append(gen_op_line(l.pts[0][0], l.pts[0][1], l.pts[1][0] - l.pts[0][0], l.pts[1][1] - l.pts[0][1], l.linewidth))
