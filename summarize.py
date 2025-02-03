@@ -1,13 +1,13 @@
+from langchain.document_loaders import PyPDFLoader
 from summarizer import Summarizer
 
 from transformers import *
-from utils import images_to_text, clean_text, chunkify_with_overlap, query_and_respond, MultiChatManager, abstractive_summarization
+from utils import abstractive_summarization, extract_keywords, timeline
 
 from config.config import AI_CONFIG, API_CONFIG
 
 from api import EmbeddingAPI, ChatCompletionsExecutor
 
-import pytextrank
 import spacy
 import requests
 import networkx as nx
@@ -27,20 +27,71 @@ custom_tokenizer = AutoTokenizer.from_pretrained('allenai/scibert_scivocab_uncas
 custom_model = AutoModel.from_pretrained('allenai/scibert_scivocab_uncased', config=custom_config)
 
 model = Summarizer(custom_model=custom_model, custom_tokenizer=custom_tokenizer)
-# PDF에서 텍스트 추출
 
+# PDF 파일 경로 설정
+pdf_filepath = '/data/ephemeral/home/A_survey_of_3d_Gaussian_Splatting.pdf'
 
+# PyPDFLoader를 사용하여 PDF 파일 로드
+loader = PyPDFLoader(pdf_filepath)
+pages = loader.load()
 
+# 각 페이지의 내용을 page와 page_label에 맞게 저장
+page_dict = {}
+for page in pages:
+    page_number = page.metadata.get('page', 'Unknown')
+    page_label = page.metadata.get('page_label', 'Unknown')
+    page_content = page.page_content.replace('\n', ' ')  # \n을 공백으로 대체
+    page_dict[page_number] = {
+        'page_label': page_label,
+        'content': page_content
+    }
 
+# 모든 페이지를 리스트 형태로 저장
+page_list = []
+for page_number, page_info in page_dict.items():
+    page_list.append({
+        'page_number': page_number,
+        'page_label': page_info['page_label'],
+        'content': page_info['content']
+    })
 
-# 텍스트에서 줄바꿈을 기준으로 분리하고 공백이나 특수 문자가 있는 경우 합침
-cleaned_text = ' '.join(text.splitlines())
+# 모든 페이지 출력
+for page in page_list:
+    print(f"Page Number: {page['page_number']}")
+    print(f"Page Label: {page['page_label']}")
+    print(f"Content: {page['content']}")
+    print("-" * 40)  # 페이지 구분을 위한 구분선
 
-# 중간에 끊어진 부분이 있다면, 공백으로 연결하여 정리된 텍스트를 출력
-# print(cleaned_text)
-res = model(cleaned_text,  num_sentences=30)
-print(res)
+# 각 페이지의 page_label별로 요약 수행
+label_summaries = {}
+for page in page_list:
+    page_label = page['page_label']
+    content = page['content']
+    
+    if page_label not in label_summaries:
+        label_summaries[page_label] = ""
+    
+    summary = model(content, num_sentences=10)
+    label_summaries[page_label] += summary + " "
 
-res2 = extractive_summarization(cleaned_text, '')
-result = abstractive_summarization(res, completion_executor)
+# label_summaries에 저장된 각 page_label별 요약 결과 출력
+for label, summary in label_summaries.items():
+    print(f"Page Label: {label}")
+    print(f"Summary: {summary}")
+    print("-" * 40)  # 구분선
+
+# 모든 page_label별 요약을 하나로 합침
+combined_summary = " ".join(label_summaries.values())
+final_summary = model(combined_summary, num_sentences=30)
+
+# 최종 요약 결과 출력
+print("Final Summary:")
+print(final_summary)
+
+result = abstractive_summarization(final_summary, completion_executor)
+
+##추출된 요약이라고 가정 (키워드 포함)
+query_list = extract_keywords(result)
+## 키워드 검색, JSON 파일 저장
+timeline(query_list)
 print(result)
