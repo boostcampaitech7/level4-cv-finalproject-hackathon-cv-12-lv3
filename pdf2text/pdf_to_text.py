@@ -99,15 +99,35 @@ class Pdf2Text(object):
         match_res, unmatch_res = matching_captioning(
             caption_outputs, table_figure_outputs)
 
+        # path = "gaussian_splatting"
+
+        # import os
         # for key in match_res:
+        #     path += f"/{key}"
+        #     os.makedirs(path, exist_ok=True)
         #     for obj in match_res[key]:
-        #         path = f"{key}_{obj['caption_number']}.png"
+        #         path += f"/{obj['caption_number']}.png"
         #         rect = Rect(obj['obj_bbox']).include_rect(
         #             Rect(obj['caption_bbox']))
         #         bb = (rect.top_left[0], rect.top_left[1],
         #               rect.bottom_right[0], rect.bottom_right[1])
         #         img.crop(bb).save(path, "png")
+        #         path = os.path.dirname(path)
+        #     path = os.path.dirname(path)
 
+        # path += "/unmatched"
+        # os.makedirs(path, exist_ok=True)
+        # for key in unmatch_res:
+        #     if key == 'caption':
+        #         for caption in unmatch_res[key]:
+        #             print(caption['item'] + f" {caption['type']}")
+        #     else:
+        #         for idx, obj in enumerate(unmatch_res[key]):
+        #             if isinstance(obj['item'], Image.Image):
+        #                 obj['item'].save(
+        #                     path + f"/{obj['type']}_{idx}.png", 'png')
+        #             else:
+        #                 print(obj['item'])
         # TODO 분리해낸 Table, Figure를 어떤 방식으로 제공할 것인가?
 
         return " ".join(final_outputs)

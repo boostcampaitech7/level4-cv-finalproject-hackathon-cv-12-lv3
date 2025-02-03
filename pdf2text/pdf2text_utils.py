@@ -801,6 +801,9 @@ def matching_captioning(captions: List[Tuple[str, List[int], str]],
     unmatched_result = {'obj': [], 'caption': []}
 
     idx = 0
+    captions.sort(key=lambda x: (x[1][1], x[1][0]))
+    objects.sort(key=lambda x: (x[1][1], x[1][0]))
+
     for caption_text, caption_bbox, caption_type in captions:
         caption_number = extract_caption_number(caption_text)
         if caption_number is None:
@@ -810,7 +813,7 @@ def matching_captioning(captions: List[Tuple[str, List[int], str]],
             idx += 1
             continue
 
-        matched_object = None
+        matched_object, matched_object_type = None, None
         min_distance = float('inf')
 
         for obj, obj_bbox, obj_type in objects:
@@ -820,6 +823,7 @@ def matching_captioning(captions: List[Tuple[str, List[int], str]],
             cur_distance = calculate_bbox_distance(caption_bbox, obj_bbox)
             if cur_distance < min_distance:
                 min_distance = cur_distance
+                matched_object_type = obj_type.lower()
                 matched_object = {
                     "caption_number": caption_number,
                     'obj': obj,
@@ -830,9 +834,9 @@ def matching_captioning(captions: List[Tuple[str, List[int], str]],
         if matched_object:
             objects = [obj for obj in objects if obj[0]
                        != matched_object['obj']]
-            matched_result[obj_type.lower()].append(matched_object)
+            matched_result[matched_object_type].append(matched_object)
         else:
-            unmatched_result['caption'].append({"text": captions[idx][0],
+            unmatched_result['caption'].append({"item": captions[idx][0],
                                                 "bbox": captions[idx][1],
                                                 'type': captions[idx][2]})
         idx += 1
@@ -862,15 +866,17 @@ def extract_caption_number(caption_text: str) -> Optional[str]:
 
 def calculate_bbox_distance(bbox1: List[int], bbox2: List[int]) -> int:
     """
-    두 bounding box 간의 거리(차이)를 계산합니다.
+    두 bounding box 간의 중심점 사이의 유클리드 거리(가까운 정도)를 계산합니다.
 
     Args:
         bbox1 (List[int]): 첫 번째 bounding box (xmin, ymin, xmax, ymax).
         bbox2 (List[int]): 두 번째 bounding box (xmin, ymin, xmax, ymax).
 
     Returns:
-        int: 두 bounding box 간의 x 및 y 좌표 차이의 합.
+        int: 두 bounding box 중심점 사이의 거리.
     """
-    x = abs(bbox1[0] - bbox2[0])
-    y = abs(bbox1[1] - bbox2[1])
-    return x + y
+    bbox1_center = [(bbox1[2] + bbox1[0]) / 2, (bbox1[3] + bbox1[1]) / 2]
+    bbox2_center = [(bbox2[2] + bbox2[0]) / 2, (bbox2[3] + bbox2[1]) / 2]
+    x_diff = abs(bbox1_center[0] - bbox2_center[0])
+    y_diff = abs(bbox1_center[1] - bbox2_center[1])
+    return int(x_diff + y_diff)
