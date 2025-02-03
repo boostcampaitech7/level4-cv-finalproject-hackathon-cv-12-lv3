@@ -66,7 +66,57 @@ def chunkify_with_overlap(sentences: List[str], chunk_size: int = 256, overlap_s
 
     return chunks
 
+def group_academic_paragraphs(sentences, max_sentences=5, similarity_threshold=0.4, window_size=3):
+    model = SentenceTransformer("dragonkue/bge-m3-ko")
+    # sentences = split_into_sentences(sentences)
+    
+    # 임베딩을 한 번만 계산
+    embeddings = model.encode(sentences, convert_to_tensor=True)
+    
+    groups = []
+    current_group = [sentences[0]]
+    current_avg_embedding = embeddings[0]
+    
+    for i in range(1, len(sentences)):
+        window_start = max(0, i - window_size)
+        window_embeddings = embeddings[window_start:i]
+        window_avg = torch.mean(window_embeddings, dim=0)
+        
+        context_similarity = util.pytorch_cos_sim(window_avg, embeddings[i]).item()
+        direct_similarity = util.pytorch_cos_sim(embeddings[i-1], embeddings[i]).item()
+        
+        weighted_similarity = 0.7 * context_similarity + 0.3 * direct_similarity
+        
+        if weighted_similarity >= similarity_threshold and len(current_group) < max_sentences:
+            current_group.append(sentences[i])
+            current_avg_embedding = torch.mean(embeddings[len(current_group)-window_size:len(current_group)], dim=0)
+        else:
+            # 현재 그룹을 최종 그룹에 추가
+            groups.append(current_group)
+            # 새 그룹 시작
+            current_group = [sentences[i]]
+    
+    # 마지막 그룹 처리
+    if current_group:
+        groups.append(current_group)
+    
+    # 모든 그룹을 max_sentences 기준으로 재분할
+    final_groups = []
+    for group in groups:
+        # 그룹을 max_sentences 크기의 서브그룹으로 분할
+        for i in range(0, len(group), max_sentences):
+            final_groups.append(group[i:i+max_sentences])
+    
+    for i in range(1, len(final_groups)):  # 첫 번째 문단은 제외하고 시작
+        if len(final_groups[i]) <= 2:
+            # 이전 문단과 합치기
+            final_groups[i-1].extend(final_groups[i])
+            final_groups[i] = []
+    
+    # 빈 리스트 제거
+    final_groups = [group for group in final_groups if group]
 
+    return final_groups
 # def semantic_chunking(sentences, sentence_embeddings, threshold=0.7):
 #     chunks = []
 #     chunk_embeddings = []

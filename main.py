@@ -3,7 +3,7 @@ import argparse,re
 from tqdm import tqdm
 from config.config import AI_CONFIG, API_CONFIG
 from utils import images_to_text, clean_text, chunkify_with_overlap, query_and_respond, MultiChatManager, abstractive_summarization
-from utils import llm_refine, process_query_with_reranking_compare, semantic_chunking, extractive_summarization, split_sentences, extract_paper_metadata
+from utils import llm_refine, process_query_with_reranking_compare, semantic_chunking, extractive_summarization, split_sentences, extract_paper_metadata, group_academic_paragraphs
 from api import EmbeddingAPI, ChatCompletionsExecutor, SummarizationExecutor
 from datebase import DatabaseConnection, DocumentUploader, SessionManager, PaperManager, ChatHistoryManager
 from pdf2text import Pdf2Text, pdf_to_image
@@ -58,6 +58,7 @@ if __name__ == '__main__':
         chunked_documents = []
         summarized_documents = []
         summary_list = []
+        last_two_sentences = []
         full_text = ""
         images = pdf_to_image(FILE_NAME)
         print("PDF를 이미지로 변환하였습니다.")
@@ -73,8 +74,8 @@ if __name__ == '__main__':
             # 문장단위 분할
             sentences = split_sentences(raw_text)
             # sentence_embeddings = model.encode(sentences)
-            
-            
+            if last_two_sentences:
+                sentences = last_two_sentences + sentences
             # chunks, chunk_embeddings = semantic_chunking(
             #     sentences=sentences,
             #     sentence_embeddings=sentence_embeddings,
@@ -96,7 +97,8 @@ if __name__ == '__main__':
             #         "summary": summary
             #     })
 
-            chunks = chunkify_with_overlap(sentences, CHUNK_SIZE)
+            # chunks = chunkify_with_overlap(sentences, CHUNK_SIZE)
+            chunks = group_academic_paragraphs(sentences)
             for chunk in chunks:
                 # sentence_chunk = split_sentences(chunk)
                 # summary = extractive_summarization(sentence_chunk, model=model, top_n=7)
@@ -109,7 +111,7 @@ if __name__ == '__main__':
                 #     "page": int(i + 1),
                 #     "summary": summary
                 # })
-            
+            last_two_sentences = sentences[-2:]
         for i in tqdm(chunked_documents, desc="Generating Embeddings", total=len(chunked_documents)):
         #     # embedding = embedding_api.get_embedding(i["chunk"])
         #     #  i["embedding"] = embedding
