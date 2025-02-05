@@ -69,7 +69,7 @@ if __name__ == '__main__':
             # raw_text = images_to_text(
             #     image, OCR_CONFIG['host'], OCR_CONFIG['secret_key'])
             # cleaned_text = clean_text(raw_text)
-            raw_text = pdf2text.recognize(image)
+            raw_text = pdf2text.recognize(image, lang)
             full_text += raw_text + "\n"
             # print(raw_text)
 

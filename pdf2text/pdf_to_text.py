@@ -21,7 +21,9 @@ class Pdf2Text(object):
         self.text_ocr = Text_Extractor()
 
         # 이거는 변수명 좀 수정해야할 듯 합니다.
-        self.table_ocr = TableOCR(self.text_ocr.english_ocr, self.device)
+        self.table_ocr = TableOCR(self.text_ocr.korean_ocr,
+                                  self.text_ocr.english_ocr,
+                                  self.device)
 
     def __call__(self, image, **kwargs):
         return self.recognize(image, **kwargs)
