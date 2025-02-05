@@ -42,12 +42,12 @@ def divide_pdf_lang(page: Union[Page]) -> str:
     return "korean" if korean_texts else "en"
 
 
-def pdf_to_image(pdf_path: Union[Document, str, Path]) -> Tuple[List[Image.Image], str]:
+def pdf_to_image(pdf_path: Union[Document, str, Path, io.BytesIO]) -> Tuple[List[Image.Image], str]:
     """
     PDF 파일을 이미지로 변환하고, 첫 번째 페이지의 언어를 감지하는 함수.
 
     Args:
-        pdf_path (Union[Document, str, Path]): 변환할 PDF 파일의 경로 또는 PyMuPDF의 Document 객체.
+        pdf_path (Union[Document, str, Path, io.BytesIO]): 변환할 PDF 파일의 경로 또는 PyMuPDF의 Document 객체.
 
     Returns:
         Tuple[List[PIL.Image.Image], str]: 변환된 이미지 리스트와 감지된 언어 ('korean' 또는 'en').
@@ -65,6 +65,8 @@ def pdf_to_image(pdf_path: Union[Document, str, Path]) -> Tuple[List[Image.Image
         pages = fitz.open(str(pdf_path))  # PyMuPDF는 Path 객체를 직접 받지 못함, str로 변환
     elif isinstance(pdf_path, Document):
         pages = pdf_path
+    elif isinstance(pdf_path, io.BytesIO):
+        pages = fitz.open(stream=pdf_path, filetype='pdf')
     else:
         raise TypeError("pdf_path는 str, Path 또는 PyMuPDF의 Document 객체여야 합니다.")
 
