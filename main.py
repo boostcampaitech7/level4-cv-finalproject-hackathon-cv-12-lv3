@@ -3,7 +3,7 @@ import argparse,re
 from tqdm import tqdm
 from config.config import AI_CONFIG, API_CONFIG
 from utils import images_to_text, clean_text, chunkify_with_overlap, query_and_respond, MultiChatManager, abstractive_summarization
-from utils import llm_refine, process_query_with_reranking_compare, semantic_chunking, extractive_summarization, split_sentences, extract_paper_metadata, group_academic_paragraphs
+from utils import llm_refine, process_query_with_reranking_compare, extractive_summarization, split_sentences, extract_paper_metadata, group_academic_paragraphs
 from api import EmbeddingAPI, ChatCompletionsExecutor, SummarizationExecutor
 from datebase import DatabaseConnection, DocumentUploader, SessionManager, PaperManager, ChatHistoryManager
 from pdf2text import Pdf2Text, pdf_to_image
@@ -24,7 +24,7 @@ if __name__ == '__main__':
     SYSTEM_MESSAGE = """안녕하세요! 저는 논문 도우미 SummarAI입니다. 
     논문을 이해하고 분석하는 데 도움을 드릴 수 있어요. 
     어떤 것이든 물어보세요!"""
-    lang = "korean"
+    lang = "en"
 
     model = SentenceTransformer("dragonkue/bge-m3-ko")
     # reranker_model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
@@ -118,11 +118,11 @@ if __name__ == '__main__':
             embedding = model.encode(i["chunk"])
             i["embedding"] = embedding.tolist()
             
-        # import json
-        # output_path = "summary_documents.json"
-        # with open(output_path, "w", encoding="utf-8") as json_file:
-        #     json.dump(summarized_documents, json_file, ensure_ascii=False, indent=4)
-        # print(f"청크 데이터를 JSON 파일로 저장했습니다: {output_path}")
+        import json
+        output_path = "chunked_documents"
+        with open(output_path, "w", encoding="utf-8") as json_file:
+            json.dump(chunked_documents, json_file, ensure_ascii=False, indent=4)
+        print(f"청크 데이터를 JSON 파일로 저장했습니다: {output_path}")
         
         # flattened_sentences = [item for sublist in summary_list for item in sublist]
         # summaries = extractive_summarization(flattened_sentences, model=model, top_n=10)
