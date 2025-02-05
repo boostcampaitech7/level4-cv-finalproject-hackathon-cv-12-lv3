@@ -66,6 +66,9 @@ class LayoutAnalyzer:
         }
         self.model = YOLOv10(model_path).to(self.device)
 
+    def to(self, device):
+        self.model.to(device)
+
     def parse(self, image, reshape_size=1024, confidence=0.2, iou_threshold=0.45):
         if isinstance(image, Image.Image):
             image = image.convert('RGB')
