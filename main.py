@@ -31,7 +31,7 @@ if __name__ == '__main__':
     # reranker_model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
     reranker_model = CrossEncoder(
         "jinaai/jina-reranker-v2-base-multilingual", trust_remote_code=True)
-    pdf2text = Pdf2Text(AI_CONFIG["layout_model_path"], lang=lang)
+    pdf2text = Pdf2Text(AI_CONFIG["layout_model_path"])
 
     # 데이터베이스 연결
     db_connection = DatabaseConnection()
