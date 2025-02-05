@@ -24,6 +24,8 @@ try:
                 session_id VARCHAR(36) REFERENCES sessions(session_id),
                 title TEXT NOT NULL,
                 authors TEXT,
+                abstract TEXT,
+                publication_year INTEGER,
                 uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)

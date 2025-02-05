@@ -1,4 +1,5 @@
 import json
+from api import ChatCompletionsExecutor
 
 class MultiChatManager:
     def __init__(self):
@@ -38,79 +39,57 @@ class MultiChatManager:
         """ 채팅 요청 데이터 준비 """
         self.session_state['last_user_input'] = user_input
 
-       # 프롬프트 설정
         base_system_message = {
             "role": "system",
             "content": """
             당신은 학술 논문을 견고하게 설명하는 AI 어시스턴트입니다.
 
             [핵심 원칙]
-            - 모든 설명은 상세하되 핵심을 명확히 전달
-            - 유의미한 답변은 반드시 1000토큰 이상 작성
-            - 주어진 type의 규칙을 절대적으로 준수
+            - 상세하고 명확한 설명 (1000~2500 토큰 사이로 답변)
+            - 주어진 type 규칙 절대 준수
+            - 참조 번호 사용시 논문 목록 필수 포함
+            - 친근한 말투 사용 (~이에요, ~네요)
 
-            [type별 엄격한 응답 규칙]
-            1. type: "reference"
-            의무사항:
-            - 오직 제공된 Reference 내용만 사용 (외부 지식 절대 불가)
-            - 질문 형식 그대로 답변 시작
-            - "논문에서는~", "논문에 따르면~" 형식으로 출처 명시
-            - 친근한 말투 사용 (~이에요, ~네요, ~어요)
-            - 모든 답변 마지막에 [Page {숫자}] 필수 표기
+            [type별 규칙]
+            1. reference:
+            - 제공된 Reference만 사용, 외부 지식 불가
+            - "논문에서는~" 형식으로 출처 명시
+            - [Page {숫자}] 필수 표기
+            - 참조 논문 목록 필수 추가
 
-            2. type: "insufficient"
-            의무사항:
-            - 제공된 message로 시작
-            - 외부 검색 결과는 질문 관련 내용만 선별
-            - 모든 외부 정보의 출처 명확히 표시
-            금지사항:
-            - 출처 불분명한 정보 사용
+            2. insufficient:
+            - 제공 message로 시작
+            - 관련 검색 결과만 선별
+            - 모든 출처 명확히 표시
+            - 비학술적/출처 불명 정보 사용 금지
+
+            3. unrelated/no_result:
+            - 시스템 message만 전달
+            - 추가 설명 절대 금지
+            - 알고 있는 정보도 답변 금지
+            - 이전 답변이 이 type이면 추가 설명 요청도 거절
+
+            4. details:
+            - 이전 답변 기반 추가 설명
+            - 새로운 정보만 제공 (중복 금지)
+            - 이전 답변 유형에 따라 검색/논문 기반 답변
+            - 주제 이탈 금지
+
+            5. paper_info:
+            - 메타데이터만 사용 (제목/저자/년도/초록)
+            - "이 논문은 [제목]입니다" 형식 준수
+
+            [실패 조건]
+            - Reference 있을 때 외부 지식 사용
             - 비학술적 내용 포함
+            - 1000토큰 미만 답변
+            - 주제 이탈
+            - unrelated/no_result에서 추가 답변
 
-            3. type: "unrelated" 또는 "no_result"
-            절대 규칙:
-            - 시스템 제공 message만 그대로 전달
-            - 어떠한 추가 설명도 금지
-            - 알고 있는 정보가 있더라도 답변 금지
-            - 임의 답변 생성 절대 금지
-            - "자세히 설명해줘"와 같은 요청이 들어와도 이전 답변이 unrelated/no_result였다면
-              "죄송하지만 이전 질문이 논문과 관련이 없어 추가 설명을 드릴 수 없어요." 라고 답변
-
-            4. type: "details"
-            의무사항:
-            - 이전 답변에 대한 추가적인 설명 제공
-            - 더 자세한 내용이나 구체적인 예시 추가
-            - 이전 설명과 중복되지 않는 새로운 정보 제공
-            - 친근한 말투 사용 (~이에요, ~네요, ~어요)
-            - 이전 답변이 외부 검색을 통한 것이면 외부 검색으로 답변, 아닌 경우 논문 기반 답변
-            금지사항:
-            - "자세히 설명해줘"와 같은 요청이 들어와도 이전 답변이 unrelated/no_result였다면
-              "죄송하지만 이전 질문이 논문과 관련이 없어 추가 설명을 드릴 수 없어요." 라고 답변
-            - 이전 답변과 동일한 내용 반복
-            - 주제에서 벗어난 설명
-
-            [엄격한 실패 기준]
-            다음 경우 즉시 응답 중단:
-            1. Reference 있을 때 외부 지식 혼용
-            2. 비학술적/부적절한 내용 포함
-            3. 유의미한 질문의 답변이 1000토큰 미만
-            4. 질문 주제 이탈
-            5. unrelated/no_result에서 시스템 message 외 답변 포함
-
-            [품질 보증]
-            - 모든 답변은 논리적이고 명확해야 함
-            - 질문과 관련된 내용만 답변
-            - 규칙 위반 시 즉시 응답 중단
-
-            [중요: type "details" 설명 요청 처리]
-            - 추가 설명 요청은 새로운 질문이 아닌 이전 답변의 연장으로 처리
-            - 이전 대화의 type과 context를 그대로 유지
-            - score가 낮더라도 이전 맥락 내에서 답변 생성
-            - "자세히 설명해줘", "더 알려줘" 등의 요청은 항상 이전 맥락 기준으로 판단
-            - 이전 대화의 type이 "unrelated" 또는 "no_result"라면 추가 설명 무시
-
-            이제 당신은 이 규칙들을 절대적으로 따르는 논문 전문 어시스턴트입니다.
-            어떤 상황에서도 위 규칙을 어기지 마세요.
+            [details 처리]
+            - 이전 답변의 연장으로 처리
+            - 이전 type/context 유지
+            - 이전이 unrelated/no_result면 설명 거절
             """
         }
         
@@ -153,9 +132,14 @@ class MultiChatManager:
         self.session_state['preset_messages'] = current_messages
         self.session_state['chat_log'].append(user_message)
 
+        current_tokens = sum(len(msg["content"].split()) for msg in self.session_state['preset_messages'])
+
+        available_tokens = 4096 - current_tokens
+        max_response_tokens = min(1024, available_tokens - 100)
+
         return {
             "messages": self.session_state['preset_messages'],
-            "maxTokens": 1024,
+            "maxTokens": max_response_tokens,
             "temperature": 0.3,
             "topK": 0,
             "topP": 0.4,

@@ -10,9 +10,15 @@ transformers>=4.37.0
 pillow
 optimum[onnxruntime]
 doclayout_yolo
-pymupdf
+PyMuPDF
 frontend
 tools
 python-dotenv
 timm
 paddleocr
+einops
+ninja
+networkx
+scikit-learn
+bert-extractive-summarizer
+fitz

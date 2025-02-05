@@ -18,3 +18,4 @@ __pycache__/
 
 # 테스트용 파일
 test.py
+api_test.py
