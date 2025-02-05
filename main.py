@@ -3,7 +3,7 @@ import re
 
 from tqdm import tqdm
 from config.config import AI_CONFIG, API_CONFIG
-from utils import images_to_text, clean_text, chunkify_with_overlap, query_and_respond, MultiChatManager, abstractive_summarization
+from utils import images_to_text, clean_text, chunkify_with_overlap, query_and_respond, MultiChatManager, abstractive_summarization, chunkify_to_num_token
 from utils import llm_refine, process_query_with_reranking_compare, extractive_summarization, split_sentences, extract_paper_metadata, group_academic_paragraphs
 from api import EmbeddingAPI, ChatCompletionsExecutor, SummarizationExecutor
 from datebase import DatabaseConnection, DocumentUploader, SessionManager, PaperManager, ChatHistoryManager
@@ -11,6 +11,13 @@ from pdf2text import Pdf2Text, pdf_to_image
 from sentence_transformers import SentenceTransformer, CrossEncoder
 from hashlib import sha256
 import traceback
+
+import subprocess
+import json
+def run_translate(file_name):
+    command = ["python", "utils/translate.py", file_name]
+    subprocess.run(command, capture_output=True, text=True)
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("path", type=str, help="Using Pdf Path")
@@ -31,7 +38,7 @@ if __name__ == '__main__':
     # reranker_model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
     reranker_model = CrossEncoder(
         "jinaai/jina-reranker-v2-base-multilingual", trust_remote_code=True)
-    pdf2text = Pdf2Text(AI_CONFIG["layout_model_path"], lang=lang)
+    pdf2text = Pdf2Text(AI_CONFIG["layout_model_path"])
 
     # 데이터베이스 연결
     db_connection = DatabaseConnection()
@@ -60,103 +67,43 @@ if __name__ == '__main__':
         chunked_documents = []
         summarized_documents = []
         summary_list = []
-        last_two_sentences = []
+        last_three_sentences = []
         full_text = ""
         images, lang = pdf_to_image(FILE_NAME)
         print("PDF를 이미지로 변환하였습니다.")
 
+        run_translate(FILE_NAME)
+        with open("new.json", "r", encoding="utf-8") as f:
+            new_data = json.load(f)
+
         for i, image in tqdm(enumerate(images), desc="이미지 처리 중"):
-            # raw_text = images_to_text(
-            #     image, OCR_CONFIG['host'], OCR_CONFIG['secret_key'])
-            # cleaned_text = clean_text(raw_text)
             raw_text = pdf2text.recognize(image, lang)
-            full_text += raw_text + "\n"
-            # print(raw_text)
-
-            # 문장단위 분할
             sentences = split_sentences(raw_text)
-            # sentence_embeddings = model.encode(sentences)
-            if last_two_sentences:
-                sentences = last_two_sentences + sentences
-            # chunks, chunk_embeddings = semantic_chunking(
-            #     sentences=sentences,
-            #     sentence_embeddings=sentence_embeddings,
-            #     threshold=0.4,
-            #     target_chunk_size=7,
-            #     dynamic_threshold_increment=0.1
-            # )
-
-            # for chunk, embedding in zip(chunks, chunk_embeddings):
-            #     sentence_chunk = split_sentences(chunk)
-            #     summary = extractive_summarization(sentence_chunk, model=model, top_n=2)
-            #     chunked_documents.append({
-            #         "page": int(i + 1),
-            #         "chunk": chunk,
-            #         "embedding": embedding
-            #     })
-            #     summarized_documents.append({
-            #         "page": int(i + 1),
-            #         "summary": summary
-            #     })
-
-            # chunks = chunkify_with_overlap(sentences, CHUNK_SIZE)
-            chunks = group_academic_paragraphs(sentences)
+            if last_three_sentences:
+                sentences = last_three_sentences + sentences
+            chunks = chunkify_to_num_token(sentences, 256)
             for chunk in chunks:
-                # sentence_chunk = split_sentences(chunk)
-                # summary = extractive_summarization(sentence_chunk, model=model, top_n=7)
-                # summary_list.append(summary)
-                chunked_documents.append({
-                    "page": int(i + 1),
-                    "chunk": chunk
-                })
-                # summarized_documents.append({
-                #     "page": int(i + 1),
-                #     "summary": summary
-                # })
-            last_two_sentences = sentences[-2:]
-        for i in tqdm(chunked_documents, desc="Generating Embeddings", total=len(chunked_documents)):
-            #     # embedding = embedding_api.get_embedding(i["chunk"])
-            #     #  i["embedding"] = embedding
-            embedding = model.encode(i["chunk"])
-            i["embedding"] = embedding.tolist()
-            
-        import json
-        output_path = "chunked_documents"
-        with open(output_path, "w", encoding="utf-8") as json_file:
-            json.dump(chunked_documents, json_file, ensure_ascii=False, indent=4)
-        print(f"청크 데이터를 JSON 파일로 저장했습니다: {output_path}")
+                    chunked_documents.append({"page": int(i + 1), "chunk": chunk})
+            last_three_sentences = sentences[-3:]
+
+            if str(i) in new_data:
+                new_text = new_data[str(i)]
+                new_chunks = chunkify_with_overlap(new_text, CHUNK_SIZE)
+                for chunk in new_chunks:
+                    chunked_documents.append({
+                        "page": int(i + 1),
+                        "chunk": chunk
+                    })
         
-        # flattened_sentences = [item for sublist in summary_list for item in sublist]
-        # summaries = extractive_summarization(flattened_sentences, model=model, top_n=10)
-
-        # final_summary = " ".join([item for sublist in summaries for item in sublist])
-
-        # print(final_summary)
-        # summary_result = abstractive_summarization(final_summary,completion_executor)
-        # print(summary_result)
+        for doc in tqdm(chunked_documents, desc="Generating Embeddings", total=len(chunked_documents)):
+            embedding = model.encode(doc["chunk"])
+            doc["embedding"] = embedding.tolist()
+    
 
         db_connection = DatabaseConnection()
         conn = db_connection.connect()
-
-        # 1. 세션 생성
         session_manager = SessionManager(conn)
         session_id = session_manager.create_session()
-
-        # metadata = extract_paper_metadata(full_text, completion_executor, lang)
-
-        # if metadata is None:
-        #     metadata = {
-        #         'title': FILE_NAME,
-        #         'authors': None,
-        #         'abstract': None,
-        #         'year': None
-        #     }
-        #     print("메타데이터 추출 실패. 기본값을 사용합니다.")
-        # else:
-        #     print("메타데이터 추출 성공:")
-        #     print(f"제목: {metadata['title']}")
-        #     print(f"저자: {metadata['authors']}")
-        #     print(f"연도: {metadata['year']}")
 
         metadata = {
             'title': FILE_NAME,
@@ -196,23 +143,6 @@ if __name__ == '__main__':
             user_input = input("사용자: ")
             if user_input.lower().replace(" ", "") in ['exit', 'quit', '대화종료']:
                 break
-
-            # 8-1. 질의를 강화하기
-            # enhaced_query = llm_refine(user_input, completion_executor)
-            # if enhaced_query:
-            #     print(f"질의강화 검색문: {enhaced_query}")
-            #     user_input = enhaced_query
-            # else:
-            #     print("질의 강화 쿼리가 존재하지 않습니다.")
-
-            # relevant_response = query_and_respond(
-            #     query=user_input,
-            #     conn=conn,
-            #     model=model,
-            #     session_id=session_id,
-            #     top_k=5,
-            #     chat_manager=chat_manager
-            # )
 
             relevant_response = process_query_with_reranking_compare(
                 query=user_input,
@@ -280,29 +210,6 @@ if __name__ == '__main__':
                         embedding=current_embedding,
                         chat_type=context['type']
                     )
-
-                    # 토큰 제한 체크
-                    # if multichat.check_token_limit(request_data["maxTokens"]):
-                    #     print("토큰 제한 도달. 요약을 시작합니다.")
-                    #     summary_text = summarization_executor.execute({
-                    #         "texts": [msg["content"] for msg in
-                    #                   multichat.session_state["chat_log"]],
-                    #         "autoSentenceSplitter": True,
-                    #         "segCount": -1
-                    #     })
-                    #     print(f"\n AI: {summary_text}\n")
-
-                    #     # 요약본 저장
-                    #     chat_manager.store_summary(
-                    #         session_id=session_id,
-                    #         summary=summary_text,
-                    #         summarized_chat_ids=[msg["chat_id"] for msg in
-                    #                              multichat.session_state["chat_log"]]
-                    #     )
-
-                    #     chat_manager.add_to_cache(
-                    #         session_id, user_input, context, summary_text)
-                    # else:
                     print(f"\nAI: {response['content']}")
                     chat_manager.add_to_cache(
                         session_id, user_input, context, response['content'])
