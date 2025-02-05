@@ -145,7 +145,23 @@ def save_new_json(page_number) :
         json.dump(new_data, f,ensure_ascii=False, indent=4)
 
     return True
+
+def clean_json_files():
+    """JSON 파일 초기화"""
+    json_files = ['new.json', 'original.json', 'formula.json']
+
+    for file in json_files:
+        if os.path.exists(file):
+            try:
+                os.remove(file)
+                print(f"{file} 파일이 삭제되었습니다.")
+            except Exception as e:
+                print(f"{file} 파일 삭제 중 에러 발생: {str(e)}")
+
 def main(args: Optional[List[str]] = None) -> int:
+    # JSON 파일 초기화
+    clean_json_files()
+    
     logging.basicConfig()
     parsed_args = parse_args(args)
     ModelInstance.value = OnnxModel.load_available()
