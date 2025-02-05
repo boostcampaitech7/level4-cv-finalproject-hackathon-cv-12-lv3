@@ -60,18 +60,20 @@ STRUCTURE_TRANSFORM = transforms.Compose(
 
 class TableOCR:
     def __init__(self,
-                 text_ocr_model: TextOCR,  # : PaddleOCR
+                 korean_ocr_model: TextOCR,  # : PaddleOCR
+                 english_ocr_model: TextOCR,
                  device: str = None):
         self.device = select_device(device)
 
         # text OCR 모델 준비
-        self.text_ocr_model = text_ocr_model
+        self.korean_ocr_model = korean_ocr_model
+        self.english_ocr_model = english_ocr_model
 
         self.structure_model = TableTransformerForObjectDetection.from_pretrained(
             "microsoft/table-transformer-structure-recognition").to(self.device)
         self.structure_model.eval()
 
-    def ocr(self, image):
+    def ocr(self, image, lang):
         if isinstance(image, Image.Image):
             img = image.convert('RGB')
         elif isinstance(image, np.ndarray):
@@ -103,15 +105,22 @@ class TableOCR:
         ]
 
         for cells in tables_cells:
-            self._ocr_cells(img, cells)
+            self._ocr_cells(img, cells, lang)
 
         tables_cells = [table_utils.convert_to_md(
             cells) for cells in tables_cells]
 
         return tables_cells[0]
 
-    def _ocr_cells(self, image, cells):
-        text_box_infos = self.text_ocr_model.detect_only(np.array(image))
+    def _ocr_cells(self, image, cells, lang):
+        if lang == "korean":
+            text_box_infos = self.korean_ocr_model.detect_only(np.array(image))
+        elif lang == 'en':
+            text_box_infos = self.english_ocr_model.detect_only(
+                np.array(image))
+        else:
+            raise ValueError(
+                f"Unsupported language: {lang}. Supported languages are 'korean' and 'en'.")
         box_infos = []
 
         for box_info in text_box_infos[0]:  # 4개의 좌표로 구성
@@ -142,8 +151,15 @@ class TableOCR:
             if inner_text_boxes:
                 for box_info in inner_text_boxes:
                     box = box2list(box_info['position'])
-                    ocr_res = self.text_ocr_model.recognize_only(
-                        np.array(image.crop(box)))
+                    if lang == "korean":
+                        ocr_res = self.korean_ocr_model.recognize_only(
+                            np.array(image.crop(box)))
+                    elif lang == 'en':
+                        ocr_res = self.english_ocr_model.recognize_only(
+                            np.array(image.crop(box)))
+                    else:
+                        raise ValueError(
+                            f"Unsupported language: {lang}. Supported languages are 'korean' and 'en'.")
 
                     box_info['text'] = ocr_res[0][0][0]
                     box_info['type'] = 'text'

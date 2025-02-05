@@ -73,7 +73,7 @@ class Pdf2Text(object):
                 new_bbox = expand_bbox_with_original(img, bbox, 10, 10)
                 crop_img = img.crop(new_bbox)
                 table_figure_outputs.append(
-                    (self.table_ocr.ocr(crop_img), new_bbox, "Table"))
+                    (self.table_ocr.ocr(crop_img, lang), new_bbox, "Table"))
                 # final_outputs.append(self.table_ocr.ocr(crop_img))
 
             elif ele_type == ElementType.FIGURE:
@@ -170,7 +170,7 @@ class Pdf2Text(object):
                 new_bbox = expand_bbox_with_original(img, bbox, 10, 10)
                 crop_img = img.crop(new_bbox)
                 table_figure_outputs.append(
-                    (self.table_ocr.ocr(crop_img), new_bbox, "Table"))
+                    (self.table_ocr.ocr(crop_img, lang), new_bbox, "Table"))
 
             elif ele_type == ElementType.FIGURE:
                 table_figure_outputs.append((crop_img, bbox, "Figure"))
