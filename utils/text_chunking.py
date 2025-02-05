@@ -68,14 +68,13 @@ def chunkify_with_overlap(sentences: List[str], chunk_size: int = 256, overlap_s
 
     return chunks
 
-def chunkify_to_num_token(text: str, chunk_size: int = 256) -> List[str]:
+def chunkify_to_num_token(sentences, chunk_size = 256):
     """
     텍스트를 토큰 수 기준으로 분할하는 함수 (중복 방지)
     :param text: 입력 텍스트
     :param chunk_size: 청크당 최대 토큰 수
     :return: 분할된 청크 리스트
     """
-    sentences = re.split(r'(?<=[.!?])\s+', text)  # 문장 단위로 분할
     chunks = []
     current_chunk = ""
     current_token_count = 0
@@ -116,10 +115,7 @@ def chunkify_to_num_token(text: str, chunk_size: int = 256) -> List[str]:
         chunks.append(current_chunk.strip())
     return chunks
 
-def group_academic_paragraphs(sentences, max_sentences=5, similarity_threshold=0.4, window_size=3):
-    model = SentenceTransformer("dragonkue/bge-m3-ko")
-    # sentences = split_into_sentences(sentences)
-    
+def group_academic_paragraphs(sentences, model, max_sentences=5, similarity_threshold=0.4, window_size=3):
     # 임베딩을 한 번만 계산
     embeddings = model.encode(sentences, convert_to_tensor=True)
     

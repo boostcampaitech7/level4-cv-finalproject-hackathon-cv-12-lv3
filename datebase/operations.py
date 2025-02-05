@@ -69,46 +69,35 @@ class PaperManager:
 class DocumentUploader:
     def __init__(self, connection):
         self.conn = connection
-
     def clean_text(self, text):
         if text is None:
             return None
-        
         try:
-            if isinstance(text, str):
-                text = text.encode('utf-8', errors='ignore')
+            # 리스트인 경우 문자열로 변환
+            if isinstance(text, list):
+                text = ' '.join(map(str, text))
+            # 문자열이 아닌 경우 문자열로 변환
+            if not isinstance(text, str):
+                text = str(text)
+            # 인코딩/디코딩 처리
+            text = text.encode('utf-8', errors='ignore')
             return text.decode('utf-8', errors='ignore').strip()
         except Exception as e:
             print(f"텍스트 정제 중 에러 발생: {str(e)}")
             return None
-
     def upload_documents(self, chunked_documents, session_id):
         try:
             cur = self.conn.cursor()
             count = 0
-
             for doc in tqdm(chunked_documents):
-                try:
-                    cleaned_text = self.clean_text(doc["chunk"])
-                    if not cleaned_text:
-                        print(f"빈 텍스트 건너뛰기: {doc['page']} 페이지")
-                        continue
-
-                    vector_str = f"[{','.join(map(str, doc['embedding']))}]"
-                    
-                    cur.execute("""
-                        INSERT INTO public.documents (session_id, page, content, embedding)
-                        VALUES (%s, %s, %s, %s::cdb_admin.vector)            
-                    """, (session_id, doc["page"], cleaned_text, vector_str))
-                    count += 1
-                    
-                except Exception as e:
-                    print(f"개별 문서 삽입 중 에러 발생 (페이지 {doc['page']}): {str(e)}")
-                    continue
-            
+                vector_str = f"[{','.join(map(str, doc['embedding']))}]"
+                cur.execute("""
+                    INSERT INTO public.documents (session_id, page, content, embedding)
+                    VALUES (%s, %s, %s, %s::cdb_admin.vector)
+                """, (session_id, doc["page"], doc["chunk"], vector_str))
+                count += 1
             self.conn.commit()
             print(f"데이터 업로드 완료! 총 {count}개의 문서가 업로드 되었습니다.")
-
         except Exception as e:
             self.conn.rollback()
             print(f"업로드 중 에러 발생: {str(e)}")

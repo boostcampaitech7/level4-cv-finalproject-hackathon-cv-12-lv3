@@ -4,6 +4,7 @@ import numpy as np
 from PIL import Image
 from pathlib import Path
 from fitz import Rect
+import torch
 
 from .table_ocr import TableOCR
 from .layout_analysis import LayoutAnalyzer, ElementType
