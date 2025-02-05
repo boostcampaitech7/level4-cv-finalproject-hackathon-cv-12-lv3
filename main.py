@@ -1,4 +1,5 @@
-import argparse,re
+import argparse
+import re
 
 from tqdm import tqdm
 from config.config import AI_CONFIG, API_CONFIG
@@ -28,7 +29,8 @@ if __name__ == '__main__':
 
     model = SentenceTransformer("dragonkue/bge-m3-ko")
     # reranker_model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
-    reranker_model = CrossEncoder("jinaai/jina-reranker-v2-base-multilingual", trust_remote_code=True)
+    reranker_model = CrossEncoder(
+        "jinaai/jina-reranker-v2-base-multilingual", trust_remote_code=True)
     pdf2text = Pdf2Text(AI_CONFIG["layout_model_path"], lang=lang)
 
     # 데이터베이스 연결
@@ -60,7 +62,7 @@ if __name__ == '__main__':
         summary_list = []
         last_two_sentences = []
         full_text = ""
-        images = pdf_to_image(FILE_NAME)
+        images, lang = pdf_to_image(FILE_NAME)
         print("PDF를 이미지로 변환하였습니다.")
 
         for i, image in tqdm(enumerate(images), desc="이미지 처리 중"):
@@ -70,7 +72,7 @@ if __name__ == '__main__':
             raw_text = pdf2text.recognize(image)
             full_text += raw_text + "\n"
             # print(raw_text)
-            
+
             # 문장단위 분할
             sentences = split_sentences(raw_text)
             # sentence_embeddings = model.encode(sentences)
@@ -83,7 +85,7 @@ if __name__ == '__main__':
             #     target_chunk_size=7,
             #     dynamic_threshold_increment=0.1
             # )
-            
+
             # for chunk, embedding in zip(chunks, chunk_embeddings):
             #     sentence_chunk = split_sentences(chunk)
             #     summary = extractive_summarization(sentence_chunk, model=model, top_n=2)
@@ -113,26 +115,26 @@ if __name__ == '__main__':
                 # })
             last_two_sentences = sentences[-2:]
         for i in tqdm(chunked_documents, desc="Generating Embeddings", total=len(chunked_documents)):
-        #     # embedding = embedding_api.get_embedding(i["chunk"])
-        #     #  i["embedding"] = embedding
+            #     # embedding = embedding_api.get_embedding(i["chunk"])
+            #     #  i["embedding"] = embedding
             embedding = model.encode(i["chunk"])
             i["embedding"] = embedding.tolist()
-            
+
         # import json
         # output_path = "summary_documents.json"
         # with open(output_path, "w", encoding="utf-8") as json_file:
         #     json.dump(summarized_documents, json_file, ensure_ascii=False, indent=4)
         # print(f"청크 데이터를 JSON 파일로 저장했습니다: {output_path}")
-        
+
         # flattened_sentences = [item for sublist in summary_list for item in sublist]
         # summaries = extractive_summarization(flattened_sentences, model=model, top_n=10)
-        
+
         # final_summary = " ".join([item for sublist in summaries for item in sublist])
-        
+
         # print(final_summary)
         # summary_result = abstractive_summarization(final_summary,completion_executor)
         # print(summary_result)
-        
+
         db_connection = DatabaseConnection()
         conn = db_connection.connect()
 
@@ -157,10 +159,10 @@ if __name__ == '__main__':
         #     print(f"연도: {metadata['year']}")
 
         metadata = {
-                'title': FILE_NAME,
-                'authors': None,
-                'abstract': None,
-                'year': None
+            'title': FILE_NAME,
+            'authors': None,
+            'abstract': None,
+            'year': None
         }
 
         # 4. 논문 정보 저장
@@ -202,7 +204,7 @@ if __name__ == '__main__':
             #     user_input = enhaced_query
             # else:
             #     print("질의 강화 쿼리가 존재하지 않습니다.")
-            
+
             # relevant_response = query_and_respond(
             #     query=user_input,
             #     conn=conn,
@@ -219,13 +221,13 @@ if __name__ == '__main__':
                 reranker=reranker_model,
                 completion_executor=completion_executor,
                 session_id=session_id,
-                top_k= 3 if lang == 'en' else 2,
+                top_k=3 if lang == 'en' else 2,
                 chat_manager=chat_manager
             )
 
             context_result = chat_manager.handle_question(
                 user_input, session_id)
-            
+
             if relevant_response is not None:
                 if relevant_response['type'] == "reference":
                     context = {

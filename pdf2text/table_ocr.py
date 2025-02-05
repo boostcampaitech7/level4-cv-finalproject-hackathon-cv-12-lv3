@@ -72,7 +72,6 @@ class TableOCR:
         self.structure_model.eval()
 
     def ocr(self, image):
-        # TODO table ocr
         if isinstance(image, Image.Image):
             img = image.convert('RGB')
         elif isinstance(image, np.ndarray):
