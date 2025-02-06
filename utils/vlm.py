@@ -23,7 +23,9 @@ def conversation_with_images(model_path, images, image_description=None, convers
     Returns:
         str: Generated response from the assistant.
     """
-    
+    if not isinstance(images, list):
+        images = [images]
+        
     # Set default conversation if not provided
     if conversation is None:
         conversation = [
