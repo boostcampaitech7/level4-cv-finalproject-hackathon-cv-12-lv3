@@ -1,7 +1,3 @@
-import os
-import io
-from PIL import Image
-from fitz import Rect
 from collections import defaultdict
 from functools import lru_cache
 
@@ -12,12 +8,12 @@ from fastapi import HTTPException
 
 from config.config import AI_CONFIG
 from pdf2text import Pdf2Text, pdf_to_image
-from utils import FileManager
+from utils import FileManager, MultiChatManager
 from utils import model_manager
 from utils import split_sentences, chunkify_to_num_token, chunkify_with_overlap
 
 from datebase.connection import DatabaseConnection
-from datebase.operations import PaperManager, SessionManager, DocumentUploader
+from datebase.operations import PaperManager, DocumentUploader, ChatHistoryManager
 
 from sentence_transformers import SentenceTransformer
 
@@ -87,7 +83,6 @@ async def upload_pdf(file: UploadFile,
             'year': None
         }
 
-        # TODO pdf를 Object Storage에 저장하는 코드
         paper_id = file_manager.store_paper(file, paper_info, user_id)
 
         return {"success": True, "message": "PDF uploaded successfully", "data": {"filename": paper_info['title'], "file_id": paper_id}}
@@ -103,7 +98,6 @@ async def prepare_chatbot_base(req: PdfRequest,
                                document_mannager: DocumentUploader = Depends(get_document_manager)):
     global user_id
 
-    # TODO pdf_id와 user 정보를 바탕으로 pdf 가져오기
     pdf_id = req.pdf_id
     pdf = file_manager.get_paper(user_id, pdf_id)
 
@@ -127,11 +121,9 @@ async def prepare_chatbot_base(req: PdfRequest,
 
 @app.post("/table-figure", status_code=status.HTTP_200_OK)
 async def pdf2text_table_figure(req: PdfRequest,
-                                conn=Depends(get_db_connection),
                                 file_manager: FileManager = Depends(get_file_manager)):
     global user_id
 
-    # TODO pdf_id와 user 정보를 바탕으로 pdf 가져오기
     pdf_id = req.pdf_id
     pdf = file_manager.get_paper(user_id, pdf_id)
 
