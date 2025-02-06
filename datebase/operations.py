@@ -157,7 +157,8 @@ class PaperManager(BaseDBHandler):
         query = """
             SELECT 
                 paper_id, user_id, title, author, uploaded_at,
-                pdf_file_path, tran_pdf_file_path, summary
+                pdf_file_path, tran_pdf_file_path, short_summary,
+                long_summary
             FROM public.papers
             WHERE user_id = %s
             AND paper_id = %s
@@ -173,7 +174,8 @@ class PaperManager(BaseDBHandler):
                 'uploaded_at': result[4],
                 'pdf_file_path': result[5],
                 'tran_pdf_file_path': result[6],
-                'summary': result[7]
+                'short_summary': result[7],
+                'long_summary': result[8]
             }
         else:
             return None
@@ -544,7 +546,7 @@ class AdditionalFileUploader(BaseDBHandler):
     def search_figure_file(self, user_id, paper_id):
         query = """
             SELECT 
-                storage_path, figure_number, description
+                storage_path, caption_number, description
             FROM public.figure_info
             WHERE user_id = %s
             AND paper_id = %s
@@ -556,7 +558,7 @@ class AdditionalFileUploader(BaseDBHandler):
         for figure in figures:
             result.append({
                 'storage_path': figure[0],
-                'figure_number': figure[1],
+                'caption_number': figure[1],
                 'description': figure[2]
             })
 
@@ -565,7 +567,7 @@ class AdditionalFileUploader(BaseDBHandler):
     def search_table_file(self, user_id, paper_id):
         query = """
             SELECT 
-                storage_path, table_name, description
+                table_obj, caption_number, description
             FROM public.table_info
             WHERE user_id = %s
             AND paper_id = %s
@@ -576,8 +578,8 @@ class AdditionalFileUploader(BaseDBHandler):
         result = []
         for table in tables:
             result.append({
-                'storage_path': table[0],
-                'table_name': table[1],
+                'table_obj': table[0],
+                'caption_number': table[1],
                 'description': table[2]
             })
 
