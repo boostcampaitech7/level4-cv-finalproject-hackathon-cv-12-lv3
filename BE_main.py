@@ -1,3 +1,6 @@
+import os
+import torch
+
 from collections import defaultdict
 from functools import lru_cache
 
@@ -9,7 +12,7 @@ from fastapi.responses import FileResponse
 from config.config import AI_CONFIG, API_CONFIG
 from pdf2text import Pdf2Text, pdf_to_image
 from utils import FileManager, MultiChatManager, PaperSummarizer
-# from utils import model_manager
+# from utils.model_manager import model_manager
 from utils import split_sentences, chunkify_to_num_token, chunkify_with_overlap
 from api import EmbeddingAPI, ChatCompletionsExecutor, SummarizationExecutor
 
@@ -62,11 +65,12 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # React 앱의 주소
+    allow_origins=["*"],  # React 앱의 주소
     allow_credentials=True,
     allow_methods=["*"],  # 모든 HTTP 메소드 허용
     allow_headers=["*"],  # 모든 헤더 허용
 )
+
 
 class PdfRequest(BaseModel):
     pdf_id: int
@@ -80,6 +84,7 @@ class PdfRequest(BaseModel):
     ):
         return cls(user_id=user_id, pdf_id=pdf_id)
 
+
 @app.get("/", status_code=status.HTTP_200_OK)
 def test():
     return {"success": True, "message": "테스트 성공"}
@@ -89,6 +94,7 @@ def test():
 async def upload_pdf(file: UploadFile,
                      req: PdfRequest = Depends(PdfRequest.as_form),
                      file_manager: FileManager = Depends(get_file_manager)):
+    pdf_id, user_id = req.pdf_id, req.user_id
     try:
         print("=== Debug Info ===")
         print(f"File received: {file.filename}")
@@ -105,7 +111,7 @@ async def upload_pdf(file: UploadFile,
         print(f"File content length: {len(file_content)}")
 
         paper_info = {
-            'user_id': req.user_id,
+            'user_id': user_id,
             'title': file.filename,
             'authors': None,
             'abstract': None,
@@ -113,7 +119,8 @@ async def upload_pdf(file: UploadFile,
         }
         print(f"Paper info: {paper_info}")
 
-        paper_id = file_manager.store_paper(file_content, paper_info, req.user_id)
+        paper_id = file_manager.store_paper(
+            file_content, paper_info, user_id)
 
         return {"success": True, "message": "PDF uploaded successfully", "data": {"filename": paper_info['title'], "file_id": paper_id}}
     except Exception as e:
@@ -127,20 +134,21 @@ async def prepare_chatbot_base(req: PdfRequest,
                                    get_file_manager),
                                document_mannager: DocumentUploader = Depends(get_document_manager)):
     pdf_id, user_id = req.pdf_id, req.user_id
-    pdf = file_manager.get_paper(user_id, pdf_id)
+    pdf_path = file_manager.get_paper(user_id, pdf_id)
 
-    if pdf is None:
+    if pdf_path is None:
         return {"success": False, "message": f"PDF with ID {pdf_id} not found or not uploaded yet"}
 
-    pdf_path = "/data/ephemeral/home/ohs/level4-cv-finalproject-hackathon-cv-12-lv3/pdf_folder/1706.03762v7.pdf"
+    sentences = pdf2text_recognize(pdf_path)
 
-    sentences = pdf2text_recognize(pdf_path, key="text")
+    if os.path.exists(pdf_path):
+        os.remove(pdf_path)
 
     chunked_documents = chunking_embedding(sentences)
 
     try:
         document_mannager.upload_documents(
-            chunked_documents, user_id, req.pdf_id)
+            chunked_documents, user_id, pdf_id)
 
     except Exception as e:
         return {"success": False, "message": f"Fail.. {e}"}
@@ -152,14 +160,16 @@ async def pdf2text_table_figure(req: PdfRequest,
                                 file_manager: FileManager = Depends(get_file_manager)):
     pdf_id, user_id = req.pdf_id, req.user_id
 
-    pdf = file_manager.get_paper(user_id, pdf_id)
+    pdf_path = file_manager.get_paper(user_id, pdf_id)
 
-    if pdf is None:
+    if pdf_path is None:
         return {"success": False, "message": f"PDF with ID {pdf_id} not found or not uploaded yet"}
 
-    pdf_path = "/data/ephemeral/home/ohs/level4-cv-finalproject-hackathon-cv-12-lv3/pdf_folder/1706.03762v7.pdf"
     p2t = Pdf2Text(AI_CONFIG['layout_model_path'])
     pdf_images, lang = pdf_to_image(pdf_path)
+
+    if os.path.exists(pdf_path):
+        os.remove(pdf_path)
 
     total_match_res = defaultdict(list)
     total_unmatch_res = defaultdict(list)
@@ -172,6 +182,7 @@ async def pdf2text_table_figure(req: PdfRequest,
             total_unmatch_res[key].extend(val)
 
     del p2t
+    torch.cuda.empty_cache()
 
     # TODO 매칭된 Table은 Vector DB에 저장하는 코드
     table_flag = file_manager.store_figures_and_tables(
@@ -191,19 +202,19 @@ async def pdf2text_table_figure(req: PdfRequest,
 
 @app.post("/pdf/summarize", status_code=status.HTTP_200_OK)
 async def summarize_and_get_files(req: PdfRequest,
-                                  conn=Depends(get_db_connection),
                                   file_manager: FileManager = Depends(get_file_manager)):
+    pdf_id, user_id = req.pdf_id, req.user_id
     summarizer = PaperSummarizer()
 
-    paper_file = file_manager.get_paper(req.user_id, req.pdf_id)
+    paper_file = file_manager.get_paper(user_id, pdf_id)
 
     final_summary = summarizer.generate_summary(paper_file)
 
     file_manager.extract_summary_content(
         final_summary=final_summary,
         completion_executor=completion_executor,
-        user_id=req.user_id,
-        paper_id=req.pdf_id
+        user_id=user_id,
+        paper_id=pdf_id
     )
 
     return {"success": True, "message": "이야 이거 파일 개잘만든다 바로 storage 확인해라 ㅏㅡㅑ"}
@@ -212,7 +223,9 @@ async def summarize_and_get_files(req: PdfRequest,
 @app.get("/pdf/get_paper")
 async def get_paper(req: PdfRequest,
                     file_manager: FileManager = Depends(get_file_manager)):
-    pdf_path = file_manager.get_paper(req.user_id, req.pdf_id)
+    pdf_id, user_id = req.pdf_id, req.user_id
+
+    pdf_path = file_manager.get_paper(user_id, pdf_id)
 
     if pdf_path:
         return FileResponse(pdf_path, media_type="application/pdf")
@@ -222,7 +235,8 @@ async def get_paper(req: PdfRequest,
 @app.get("/pdf/get_figure")
 async def get_figure(req: PdfRequest,
                      file_manager: FileManager = Depends(get_file_manager)):
-    fig_paths = file_manager.get_figure(req.user_id, req.pdf_id)
+    pdf_id, user_id = req.pdf_id, req.user_id
+    fig_paths = file_manager.get_figure(user_id, pdf_id)
 
     if fig_paths:
         return {"status": "success", "figures": fig_paths}
@@ -232,7 +246,8 @@ async def get_figure(req: PdfRequest,
 @app.get("/pdf/get_timeline")
 async def get_timeline(req: PdfRequest,
                        file_manager: FileManager = Depends(get_file_manager)):
-    timeline_path = file_manager.get_timeline(req.user_id, req.pdf_id)
+    pdf_id, user_id = req.pdf_id, req.user_id
+    timeline_path = file_manager.get_timeline(user_id, pdf_id)
 
     if timeline_path:
         return FileResponse(timeline_path, media_type="application/json")
@@ -242,7 +257,8 @@ async def get_timeline(req: PdfRequest,
 @app.get("/pdf/get_audio")
 async def get_audio(req: PdfRequest,
                     file_manager: FileManager = Depends(get_file_manager)):
-    audio_path = file_manager.get_audio(req.user_id, req.pdf_id)
+    pdf_id, user_id = req.pdf_id, req.user_id
+    audio_path = file_manager.get_audio(user_id, pdf_id)
 
     if audio_path:
         return FileResponse(audio_path, media_type="audio/mpeg")
@@ -252,7 +268,8 @@ async def get_audio(req: PdfRequest,
 @app.get("/pdf/get_thumbnail")
 async def get_thumbnail(req: PdfRequest,
                         file_manager: FileManager = Depends(get_file_manager)):
-    thumbnail_path = file_manager.get_thumbnail(req.user_id, req.pdf_id)
+    pdf_id, user_id = req.pdf_id, req.user_id
+    thumbnail_path = file_manager.get_thumbnail(user_id, pdf_id)
 
     if thumbnail_path:
         return FileResponse(thumbnail_path, media_type="image/png")
@@ -262,7 +279,8 @@ async def get_thumbnail(req: PdfRequest,
 @app.get("/pdf/get_script")
 async def get_script(req: PdfRequest,
                      file_manager: FileManager = Depends(get_file_manager)):
-    script_path = file_manager.get_script(req.user_id, req.pdf_id)
+    pdf_id, user_id = req.pdf_id, req.user_id
+    script_path = file_manager.get_script(user_id, pdf_id)
 
     if script_path:
         return FileResponse(script_path, media_type="application/json")
@@ -272,7 +290,8 @@ async def get_script(req: PdfRequest,
 @app.get("/pdf/get_table")
 async def get_table(req: PdfRequest,
                     additional_uploader: AdditionalFileUploader = Depends(get_add_file_uploader)):
-    table_info = additional_uploader.search_table_file(req.user_id, req.pdf_id)
+    pdf_id, user_id = req.pdf_id, req.user_id
+    table_info = additional_uploader.search_table_file(user_id, pdf_id)
 
     if table_info:
         return {"status": "success", "tables": table_info}
@@ -287,6 +306,7 @@ def pdf2text_recognize(pdf):
     result = [p2t.recognize_only_text(page, lang) for page in pdf_images]
 
     del p2t
+    torch.cuda.empty_cache()
 
     sentences = [split_sentences(raw_text) for raw_text in result]
 
@@ -314,9 +334,11 @@ def chunking_embedding(sentences, size=256):
     #             [{"page": idx + 1, "chunk": chunk} for chunk in new_chunks])
 
     model = SentenceTransformer("dragonkue/bge-m3-ko")
+
     chunked_documents = list(map(lambda x: {
                              **x, 'embedding': model.encode(x['chunk']).tolist()}, chunked_documents))
 
     del model
+    torch.cuda.empty_cache()
 
     return chunked_documents

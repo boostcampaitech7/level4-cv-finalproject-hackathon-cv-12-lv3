@@ -15,5 +15,5 @@ from .paper_summary import PaperSummarizer
 
 __all__ = ['images_to_text', 'clean_text', 'chunkify_with_overlap', 'query_and_respond',
            'MultiChatManager', 'llm_refine', 'query_and_respond_reranker_compare', 'extractive_summarization', 'chunkify_to_num_token',
-           'split_sentences', 'abstractive_summarization', 'group_academic_paragraphs', 'process_query_with_reranking_compare', 'extract_paper_metadata']
-        #    'ModelManager', 'model_manager']
+           'split_sentences', 'abstractive_summarization', 'group_academic_paragraphs', 'process_query_with_reranking_compare', 'extract_paper_metadata',]
+#    'ModelManager', 'model_manager']
