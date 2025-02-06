@@ -124,13 +124,35 @@ Install the necessary Python packages by running:
 ```
 pip install -r requirements.txt
 ```
-## Development
-### 개발 환경
+## Development Environment
 - Tesla V100 32GB & 4EA
 - Naver Cloud Platform(NCP)
   
-### Dependency
-         pytorch: 1.12.0
+## Dependency
+         psycopg2-binary
+         sentence-transformers
+         mlflow
+         langchain
+         langchain_openai
+         langchain_anthropic
+         langchain_core
+         tiktoken
+         transformers>=4.37.0
+         pillow
+         optimum[onnxruntime]
+         doclayout_yolo
+         PyMuPDF
+         frontend
+         tools
+         python-dotenv
+         timm
+         paddleocr
+         einops
+         ninja
+         networkx
+         scikit-learn
+         bert-extractive-summarizer
+         fitz
 
 
 ## Refernece
