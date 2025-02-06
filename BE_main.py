@@ -2,14 +2,14 @@ from collections import defaultdict
 from functools import lru_cache
 
 from pydantic import BaseModel
-from fastapi import FastAPI, UploadFile, status, Depends, HTTPException
+from fastapi import FastAPI, UploadFile, status, Depends, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from config.config import AI_CONFIG, API_CONFIG
 from pdf2text import Pdf2Text, pdf_to_image
 from utils import FileManager, MultiChatManager, PaperSummarizer
-from utils import model_manager
+# from utils import model_manager
 from utils import split_sentences, chunkify_to_num_token, chunkify_with_overlap
 from api import EmbeddingAPI, ChatCompletionsExecutor, SummarizationExecutor
 
@@ -23,10 +23,7 @@ from sentence_transformers import SentenceTransformer
 def get_db_connection():
     db_connection = DatabaseConnection()
     conn = db_connection.connect()
-    try:
-        yield conn
-    finally:
-        conn.close()
+    return conn
 
 
 def get_file_manager(conn=Depends(get_db_connection)):
@@ -71,13 +68,17 @@ app.add_middleware(
     allow_headers=["*"],  # 모든 헤더 허용
 )
 
-# 필요 변수 선언
-user_id = 'admin'
-
-
 class PdfRequest(BaseModel):
     pdf_id: int
+    user_id: str = 'admin'
 
+    @classmethod
+    def as_form(
+        cls,
+        user_id: str = Form('admin'),
+        pdf_id: int = Form(0)
+    ):
+        return cls(user_id=user_id, pdf_id=pdf_id)
 
 @app.get("/", status_code=status.HTTP_200_OK)
 def test():
@@ -86,9 +87,13 @@ def test():
 
 @app.post("/pdf", status_code=status.HTTP_201_CREATED)
 async def upload_pdf(file: UploadFile,
+                     req: PdfRequest = Depends(PdfRequest.as_form),
                      file_manager: FileManager = Depends(get_file_manager)):
-    global user_id
     try:
+        print("=== Debug Info ===")
+        print(f"File received: {file.filename}")
+        print(f"Request data: {req}")
+
         if not file.filename.endswith('.pdf'):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                 detail="PDF 파일만 업로드 가능합니다.")
@@ -96,15 +101,19 @@ async def upload_pdf(file: UploadFile,
         # Byte로 변경
         # stream = io.BytesIO(await file.read())
 
+        file_content = await file.read()
+        print(f"File content length: {len(file_content)}")
+
         paper_info = {
-            'user_id': user_id,
+            'user_id': req.user_id,
             'title': file.filename,
             'authors': None,
             'abstract': None,
             'year': None
         }
+        print(f"Paper info: {paper_info}")
 
-        paper_id = file_manager.store_paper(file, paper_info, user_id)
+        paper_id = file_manager.store_paper(file_content, paper_info, req.user_id)
 
         return {"success": True, "message": "PDF uploaded successfully", "data": {"filename": paper_info['title'], "file_id": paper_id}}
     except Exception as e:
@@ -117,9 +126,7 @@ async def prepare_chatbot_base(req: PdfRequest,
                                file_manager: FileManager = Depends(
                                    get_file_manager),
                                document_mannager: DocumentUploader = Depends(get_document_manager)):
-    global user_id
-
-    pdf_id = req.pdf_id
+    pdf_id, user_id = req.pdf_id, req.user_id
     pdf = file_manager.get_paper(user_id, pdf_id)
 
     if pdf is None:
@@ -143,9 +150,8 @@ async def prepare_chatbot_base(req: PdfRequest,
 @app.post("/table-figure", status_code=status.HTTP_200_OK)
 async def pdf2text_table_figure(req: PdfRequest,
                                 file_manager: FileManager = Depends(get_file_manager)):
-    global user_id
+    pdf_id, user_id = req.pdf_id, req.user_id
 
-    pdf_id = req.pdf_id
     pdf = file_manager.get_paper(user_id, pdf_id)
 
     if pdf is None:
@@ -189,14 +195,14 @@ async def summarize_and_get_files(req: PdfRequest,
                                   file_manager: FileManager = Depends(get_file_manager)):
     summarizer = PaperSummarizer()
 
-    paper_file = file_manager.get_paper(user_id, req.pdf_id)
+    paper_file = file_manager.get_paper(req.user_id, req.pdf_id)
 
     final_summary = summarizer.generate_summary(paper_file)
 
     file_manager.extract_summary_content(
         final_summary=final_summary,
         completion_executor=completion_executor,
-        user_id=user_id,
+        user_id=req.user_id,
         paper_id=req.pdf_id
     )
 
@@ -206,7 +212,7 @@ async def summarize_and_get_files(req: PdfRequest,
 @app.get("/pdf/get_paper")
 async def get_paper(req: PdfRequest,
                     file_manager: FileManager = Depends(get_file_manager)):
-    pdf_path = file_manager.get_paper(user_id, req.pdf_id)
+    pdf_path = file_manager.get_paper(req.user_id, req.pdf_id)
 
     if pdf_path:
         return FileResponse(pdf_path, media_type="application/pdf")
@@ -216,7 +222,7 @@ async def get_paper(req: PdfRequest,
 @app.get("/pdf/get_figure")
 async def get_figure(req: PdfRequest,
                      file_manager: FileManager = Depends(get_file_manager)):
-    fig_paths = file_manager.get_figure(user_id, req.pdf_id)
+    fig_paths = file_manager.get_figure(req.user_id, req.pdf_id)
 
     if fig_paths:
         return {"status": "success", "figures": fig_paths}
@@ -226,7 +232,7 @@ async def get_figure(req: PdfRequest,
 @app.get("/pdf/get_timeline")
 async def get_timeline(req: PdfRequest,
                        file_manager: FileManager = Depends(get_file_manager)):
-    timeline_path = file_manager.get_timeline(user_id, req.pdf_id)
+    timeline_path = file_manager.get_timeline(req.user_id, req.pdf_id)
 
     if timeline_path:
         return FileResponse(timeline_path, media_type="application/json")
@@ -236,7 +242,7 @@ async def get_timeline(req: PdfRequest,
 @app.get("/pdf/get_audio")
 async def get_audio(req: PdfRequest,
                     file_manager: FileManager = Depends(get_file_manager)):
-    audio_path = file_manager.get_audio(user_id, req.pdf_id)
+    audio_path = file_manager.get_audio(req.user_id, req.pdf_id)
 
     if audio_path:
         return FileResponse(audio_path, media_type="audio/mpeg")
@@ -246,7 +252,7 @@ async def get_audio(req: PdfRequest,
 @app.get("/pdf/get_thumbnail")
 async def get_thumbnail(req: PdfRequest,
                         file_manager: FileManager = Depends(get_file_manager)):
-    thumbnail_path = file_manager.get_thumbnail(user_id, req.pdf_id)
+    thumbnail_path = file_manager.get_thumbnail(req.user_id, req.pdf_id)
 
     if thumbnail_path:
         return FileResponse(thumbnail_path, media_type="image/png")
@@ -256,7 +262,7 @@ async def get_thumbnail(req: PdfRequest,
 @app.get("/pdf/get_script")
 async def get_script(req: PdfRequest,
                      file_manager: FileManager = Depends(get_file_manager)):
-    script_path = file_manager.get_script(user_id, req.pdf_id)
+    script_path = file_manager.get_script(req.user_id, req.pdf_id)
 
     if script_path:
         return FileResponse(script_path, media_type="application/json")
@@ -266,7 +272,7 @@ async def get_script(req: PdfRequest,
 @app.get("/pdf/get_table")
 async def get_table(req: PdfRequest,
                     additional_uploader: AdditionalFileUploader = Depends(get_add_file_uploader)):
-    table_info = additional_uploader.search_table_file(user_id, req.pdf_id)
+    table_info = additional_uploader.search_table_file(req.user_id, req.pdf_id)
 
     if table_info:
         return {"status": "success", "tables": table_info}

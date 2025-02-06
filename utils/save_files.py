@@ -2,7 +2,7 @@ from storage import ObjectStorageManager
 from datebase import PaperManager, AdditionalFileUploader, DocumentUploader
 from typing import Dict
 from dotenv import load_dotenv
-from .model_manager import model_manager
+# from .model_manager import model_manager
 from .summary_short import abstractive_summarization
 from .timeline import timeline, extract_keywords
 from .script import write_full_script
@@ -10,6 +10,7 @@ from .audiobook_test import script_to_speech
 import os
 import json
 import random
+import tempfile
 
 load_dotenv()
 
@@ -22,25 +23,44 @@ class FileManager:
         self.additional_manager= AdditionalFileUploader(conn)
         self.document_manager = DocumentUploader(conn)
 
-    def store_paper(self, file_path: str, paper_info: Dict, user_id) -> str:
-        # Object Storage에 PDF 저장
-        storage_info = self.storage_manager.upload_pdf(
-            file_path=file_path,
-            bucket_name=os.getenv('NCP_BUCKET_NAME')
-        )
+    def store_paper(self, file_input, paper_info: Dict, user_id) -> str:
+        if isinstance(file_input, bytes):
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf', mode='wb')
+            temp_file.write(file_input)
+            temp_file.close()
+            file_path = temp_file.name
+        # 문자열(파일 경로)인 경우
+        elif isinstance(file_input, str):
+            file_path = file_input
+        else:
+            raise TypeError("file_input must be either bytes or str")
         
-        if not storage_info:
-            raise Exception("PDF 저장 실패")
-        
-        # DB에 논문 정보 저장
-        paper_id = self.paper_manager.store_paper_info(
-            user_id=user_id,
-            title=paper_info['title'],
-            author=paper_info['authors'],
-            pdf_file_path=storage_info['path']
-        )
-        
-        return paper_id
+        try:
+            # Object Storage에 PDF 저장
+            storage_info = self.storage_manager.upload_pdf(
+                file_path=file_path,
+                bucket_name=os.getenv('NCP_BUCKET_NAME')
+            )
+            
+            if not storage_info:
+                raise Exception("PDF 저장 실패")
+            
+            if isinstance(file_input, bytes):
+                os.unlink(file_path)
+            
+            # DB에 논문 정보 저장
+            paper_id = self.paper_manager.store_paper_info(
+                user_id=user_id,
+                title=paper_info['title'],
+                author=paper_info['authors'],
+                pdf_file_path=storage_info['path']
+            )
+            
+            return paper_id
+        except Exception as e:
+            if isinstance(file_input, bytes) and 'file_path' in locals():
+                os.unlink(file_path)
+            raise e
     
     def update_translated_paper(self, file_path, user_id, paper_id):
         """번역 PDF 저장"""
@@ -61,7 +81,7 @@ class FileManager:
     def store_figures_and_tables(self, match_res, user_id, paper_id):
         """Figure랑 Table 저장 후 Vector DB 저장까지"""
         try:
-            model = model_manager.sentence_transformer
+            # model = model_manager.sentence_transformer
             chunked_documents = []
             for match_res in match_res:  # 리스트를 순회
                 if 'figure' in match_res:
@@ -102,7 +122,7 @@ class FileManager:
                             "chunk": table['caption_text'],
                             "type": "table"
                         }
-                        table_doc["embedding"] = model.encode(table_doc["chunk"]).tolist()
+                        # table_doc["embedding"] = model.encode(table_doc["chunk"]).tolist()
                         chunked_documents.append(table_doc)
 
                 if chunked_documents:
@@ -126,7 +146,7 @@ class FileManager:
                 user_id,
                 paper_id,
                 short_summary=res1,
-                result=result
+                long_summary=result
             )
 
             # 2. 키워드/태그 저장
@@ -357,22 +377,23 @@ class FileManager:
                 selected_figure = random.choice(figure_info)
                 temp_thumbnail_path = f"temp_thumbnail_{paper_id}_{figure_info['figure_number']}.png"
 
-                downloaded = self.storage_manager.download_file(
+                if self.storage_manager.download_file(
                     file_url=selected_figure['storage_path'],
                     local_path=temp_thumbnail_path,
                     bucket_name=os.getenv('NCP_BUCKET_NAME')
-                )
-
-                if downloaded:
+                ):
                     return temp_thumbnail_path
-                
-            default_downloaded = self.storage_manager.download_file(
+            
+            # 기본 썸네일 다운로드 시도
+            default_thumbnail_path = "my_friend.png"
+            if self.storage_manager.download_file(
                 file_url="my_friend.png",
-                local_path="my_friend.png",
+                local_path=default_thumbnail_path,
                 bucket_name=os.getenv('NCP_BUCKET_NAME')
-            )
-
-            return default_downloaded
+            ):
+                return default_thumbnail_path
+                
+            return None  # 다운로드 실패시 None 반환
         except Exception as e:
             print(f"Thumbnail 생성 실패: {str(e)}")
             return None
