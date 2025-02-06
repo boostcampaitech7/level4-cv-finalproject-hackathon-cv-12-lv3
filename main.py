@@ -32,7 +32,6 @@ if __name__ == '__main__':
     SYSTEM_MESSAGE = """안녕하세요! 저는 논문 도우미 SummarAI입니다. 
     논문을 이해하고 분석하는 데 도움을 드릴 수 있어요. 
     어떤 것이든 물어보세요!"""
-    lang = "en"
 
     model = SentenceTransformer("dragonkue/bge-m3-ko")
     # reranker_model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
