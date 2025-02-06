@@ -1,8 +1,8 @@
 from datasets import load_dataset
 from tqdm import tqdm
 from config.config import OCR_CONFIG, API_CONFIG, AI_CONFIG
-from utils import images_to_text, clean_text, chunkify_with_overlap, query_and_respond, MultiChatManager, abstractive_summarization, chunkify_to_num_token
-from utils import llm_refine, process_query_with_reranking_compare, extractive_summarization, split_sentences, extract_paper_metadata, group_academic_paragraphs
+from utils import images_to_text, clean_text, chunkify_with_overlap, query_and_respond, MultiChatManager, abstractive_summarization, chunkify_to_num_token, conversation_with_images
+from utils import llm_refine, process_query_with_reranking_compare, extractive_summarization, split_sentences, extract_paper_metadata, group_academic_paragraphs, conversation_with_images
 from api import EmbeddingAPI, ChatCompletionsExecutor, SummarizationExecutor
 from datebase import DatabaseConnection, DocumentUploader, SessionManager, PaperManager, ChatHistoryManager
 from sentence_transformers import SentenceTransformer, CrossEncoder
@@ -41,7 +41,7 @@ def find_matching_file(domain, target_file_name, base_dir="/data/ephemeral/home/
     else:
         return None
 
-def save_to_csv(data, filename="generated_answers.csv"):
+def save_to_csv(data, filename="generated_answers_final.csv"):
     with open(filename, mode='w', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
         writer.writerow(["Domain", "Question", "Target Answer", "Generated Answer", "Target File"])
@@ -129,25 +129,35 @@ if __name__ == '__main__':
                         "page": int(i + 1),
                         "chunk": f"{table_caption}: {table_text}"
                     })
-                #매칭된 Figure 중 caption_text만 받아오기.
+                #1. 매칭된 Figure 중 caption_text만 받아오기.
+                #2. 
                 for figure_data in matched_res["figure"]:
+                    figure_img = figure_data["obj"]
                     caption_text = figure_data["caption_text"]
                     caption_number = figure_data["caption_number"]
-                    if caption_text:  # ✅ caption이 존재할 때만 저장
-                        figure_prefix = f"Figure{caption_number}:" if caption_number else "Figure:"
+                    #이미지가 존재하는 경우에 딥식에 보내기
+                    if figure_img:
+                        res = conversation_with_images("deepseek-ai/deepseek-vl-7b-chat", figure_img, image_description=caption_text)
                         chunked_documents.append({
                             "page": int(i + 1),
-                            "chunk": f"{figure_prefix}{caption_text}"
+                            "chunk": f"{res}"
                         })
-                #매칭이 실패한 친구들중 Table 만 저장한다.
+                #1. 매칭이 실패한 친구들중 Table 저장
+                #2. 매칭이 실패한 친구들 중 이미지 딥식 보내기
                 for obj in unmatched_res["obj"]:
                     obj_type = obj["type"]
                     obj_item = obj["item"]
                     if obj_type == "Table":
                         chunked_documents.append({
-                        "page": int(i + 1),
-                        "chunk": f"Table: {obj_item}"
-                    })
+                            "page": int(i + 1),
+                            "chunk": f"Table: {obj_item}"
+                        })
+                    if obj_type == "Figure":
+                        res = conversation_with_images("deepseek-ai/deepseek-vl-7b-chat", obj_item)
+                        chunked_documents.append({
+                            "page": int(i + 1),
+                            "chunk": f"Figure: {res}"
+                        })
                 #매칭이 실패한 친구들중 caption은 다 저장한다.
                 for caption in unmatched_res["caption"]:
                     caption_item = caption["item"]
@@ -156,7 +166,6 @@ if __name__ == '__main__':
                         "chunk": f"{caption_item}:"
                     })
                         
-
             for i in tqdm(chunked_documents, desc="Generating Embeddings", total=len(chunked_documents)):
                 embedding = model.encode(i["chunk"])
                 i["embedding"] = embedding.tolist()
