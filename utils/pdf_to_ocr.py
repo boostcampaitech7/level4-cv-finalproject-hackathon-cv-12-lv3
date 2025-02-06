@@ -1,5 +1,5 @@
 from api import OCRAPIExecutor
-from pdf2image import convert_from_path
+
 
 def images_to_text(image, ocr_host, ocr_secret_key):
     # TODO 구현한 pdf2text 이식
@@ -19,12 +19,3 @@ def images_to_text(image, ocr_host, ocr_secret_key):
     text = " ".join([field['inferText']
                     for field in ocr_result['images'][0]['fields']])
     return text
-
-def pdf_to_image(pdf_path):
-    """
-    PDF 파일을 이미지로 변환하는 함수
-    :param pdf_path: PDF 파일 경로
-    :return: 이미지 리스트(PIL Image 객체)
-    """
-    images = convert_from_path(pdf_path)
-    return images

@@ -124,10 +124,10 @@ def write_full_script(text_content):
     current_conversation = {"재석": "", "하하": ""}
 
     for line in lines:
-        if line.startswith("재석:"):
-            current_conversation["재석"] = line[len("재석:"):].strip()
-        elif line.startswith("하하:"):
-            current_conversation["하하"] = line[len("하하:"):].strip()
+        if line.startswith("재석 :"):
+            current_conversation["재석"] = line[len("재석 :"):].strip()
+        elif line.startswith("하하 :"):
+            current_conversation["하하"] = line[len("하하 :"):].strip()
             conversations.append(current_conversation)
             current_conversation = {"재석": "", "하하": ""}
 

@@ -47,3 +47,12 @@ VOICE_CONFIG = {
     'voice_client_id': os.getenv('VOICE-CLIENT-ID'),
     'voice_client_secret': os.getenv('VOICE-CLIENT-SECRET')
 }
+
+# Object Storage 설정
+STORAGE_CONFIG = {
+    'ncp_access_key': os.getenv('NCP_ACCESS_KEY'),
+    'ncp_secret_key': os.getenv('NCP_SECRET_KEY'),
+    'ncp_endpoint': os.getenv('NCP_ENDPOINT'),
+    'ncp_region': os.getenv('NCP_REGION'),
+    'ncp_bucket_name': os.getenv('NCP_BUCKET_NAME')
+}
