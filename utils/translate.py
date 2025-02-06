@@ -98,7 +98,7 @@ def parse_args(args: Optional[List[str]]) -> argparse.Namespace:
     parsed_args = create_parser().parse_args(args=args)
     return parsed_args
 
-def save_new_json(page_number) :
+def save_new_json(page_number, new_data) :
     if os.path.exists('original.json'):
         with open('original.json', 'r') as f:
             existing_data = json.load(f)
@@ -168,10 +168,16 @@ def main(args: Optional[List[str]] = None) -> int:
 
     print(parsed_args)
     translate(model=ModelInstance.value, **vars(parsed_args))
-
+    
+    if os.path.exists('new.json') :
+        with open('new.json', 'r') as f :
+            new_data = json.load(f)
+    else :
+        new_data = {}
+                
     idx = 0
     while True :
-        if save_new_json(idx) :
+        if save_new_json(idx, new_data) :
             idx += 1
         else :
             break
