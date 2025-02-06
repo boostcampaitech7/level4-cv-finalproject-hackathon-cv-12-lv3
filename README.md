@@ -1,13 +1,11 @@
 # SummarAI
-![image](https://github.com/user-attachments/assets/c0a29b43-f7da-405a-9a26-c6319d16c6e1)
-
-<img src="https://github.com/user-attachments/assets/c0a29b43-f7da-405a-9a26-c6319d16c6e1" alt="thumbnail" width="1200">
-
+<div align="center">
+         <img src="https://github.com/user-attachments/assets/c0a29b43-f7da-405a-9a26-c6319d16c6e1" alt="thumbnail">
+</div>
 
 
 ![시연 사이트 사진]()
 
-~[시연 사이트 링크]()~
 
 ## Project Introduction
 📌 논문 기반으로 한 챗봇 서비스 🫧  🏠 
@@ -66,9 +64,14 @@
 
 
 ## Service Architecture
-우선 논문 PDF 파일을 업로드하여 텍스트 및 이미지 데이터를 추출합니다. 벡터 데이터베이스에서는 추출된 데이터를 벡터 형태로 저장하고, 사용자 질의와 유사한 벡터를 검색합니다. 챗봇 인터페이스를 통해 사용자는 논문에 대한 질문을 하고, Vector DB에서 검색된 답변을 제공받습니다. 추가로, AI 모델의 답변에 대한 안전성 검사를 통해 부적절한 답변을 필터링합니다.
+우선 논문 PDF 파일을 업로드하여 텍스트 및 이미지 데이터를 추출합니다. 벡터 데이터베이스에서는 추출된 데이터를 벡터 형태로 저장하고, 사용자 질의와 유사한 벡터를 검색합니다. 
 
 ![image](https://github.com/user-attachments/assets/5220c846-2858-4521-8d8a-73ae1ec235dc)
+
+챗봇 인터페이스를 통해 사용자는 논문에 대한 질문을 하고, Vector DB에서 검색된 답변을 제공받습니다. 추가로, AI 모델의 답변에 대한 안전성 검사를 통해 부적절한 답변을 필터링합니다.
+
+<img width="1147" alt="image" src="https://github.com/user-attachments/assets/d11bdc0c-789d-4577-894c-45e91cf6acd8" />
+
 
 요약 페이지에서는 논문 요약 정보, 연구 분야, 방법론, 결과 등을 제공하고, 유사 논문을 추천합니다.
 
@@ -81,7 +84,7 @@
 ## Model Architecture
 모델 파이프라인은 크게 PDF-to-Text 모듈, 요약 모듈로 나뉩니다.
 - PDF-to-Text 모듈은 PDF를 입력으로 받아, 텍스트, 이미지, 테이블로 분리하고, 각각을 OCR 모델을 통해 처리합니다.
-- 내용 인식: DocLayout-YOLO 모델 사용
+- Layout Analysis: DocLayout-YOLO 모델 사용
 - Text OCR: Table Transformer
 - Image OCR: **DeepSeek-VL**
 - Formula OCR: YOLO, PaddleOCR, Mathematical Formula Recognition(MFR)
@@ -90,9 +93,11 @@
 
 
 ## AI Safety
+프롬프트 엔지니어링을 통해 혐오, 차별적 발언을 필터링하고 사용자의 개인 정보를 보호합니다.
 ![image](https://github.com/user-attachments/assets/9a011f78-14c4-4565-9a2a-203a2ac2d5c7)
 
-## Comparison with other services
+## Comparison with other services
+기존 서비스와의 기능 비교 테이블입니다.
 ![image](https://github.com/user-attachments/assets/c9775f16-7cdf-4063-8531-df62731b531e)
 
 ## Result
