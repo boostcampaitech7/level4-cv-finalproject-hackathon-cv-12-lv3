@@ -116,6 +116,8 @@ def chunkify_to_num_token(sentences, chunk_size = 256):
     return chunks
 
 def group_academic_paragraphs(sentences, model, max_sentences=5, similarity_threshold=0.4, window_size=3):
+    # sentences = split_into_sentences(sentences)
+    
     # 임베딩을 한 번만 계산
     embeddings = model.encode(sentences, convert_to_tensor=True)
     

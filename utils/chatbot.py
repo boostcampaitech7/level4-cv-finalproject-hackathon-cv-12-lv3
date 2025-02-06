@@ -39,7 +39,7 @@ def is_paper_info_request(query: str, model) -> bool:
 
     return max(similarities) > 0.7
 
-def search_similar_doc(query_vector, conn, session_id, top_k=10):
+def search_similar_doc(query_vector, conn, user_id, paper_id, top_k=10):
     """
     고유한 문서만 선택하는 함수
     :param query_vector: 쿼리 벡터
@@ -52,13 +52,14 @@ def search_similar_doc(query_vector, conn, session_id, top_k=10):
 
     # 고유한 문서만 선택 (DISTINCT ON 사용)
     cur.execute("""
-        SELECT id, page, content, 
+        SELECT doc_id, page, content, 
         cdb_admin.cosine_distance(embedding, %s::cdb_admin.vector) as distance
-        FROM public.documents
-        WHERE session_id = %s
+        FROM public.document
+        WHERE user_id = %s
+        AND paper_id = %s
         ORDER BY cdb_admin.cosine_distance(embedding, %s::cdb_admin.vector), content
         LIMIT %s 
-    """, (vector_str, session_id, vector_str, top_k))
+    """, (vector_str, user_id, paper_id, vector_str, top_k))
 
     results = cur.fetchall()
     return [
@@ -82,8 +83,8 @@ def clean_clova_response(response_dict):
     return "응답을 가져오는데 실패했습니다."
 
 ### Multi Retrival 하는 코드 추가하기
-def query_and_respond(query: str, conn, model, session_id, top_k=3,
-                      chat_manager=None):
+def query_and_respond(query: str, conn, model, user_id, paper_id,
+                      top_k=3, chat_manager=None):
     """
     사용자의 쿼리를 임베딩하고, 검색하는 함수
     :param conn: db 접근
@@ -93,7 +94,7 @@ def query_and_respond(query: str, conn, model, session_id, top_k=3,
     """
     try:
         if is_follow_up_request(query, model):
-            last_response = chat_manager.get_last_response(session_id)
+            last_response = chat_manager.get_last_response(user_id, paper_id)
             if last_response and last_response['type'] in ['unrelated', 'no_result']:
                 return {
                     "type": "unrelated",
@@ -109,7 +110,8 @@ def query_and_respond(query: str, conn, model, session_id, top_k=3,
         matches = search_similar_doc(
             query_vector=query_vector,
             conn=conn,
-            session_id=session_id,
+            user_id=user_id,
+            paper_id=paper_id,
             top_k=top_k,
         )
 
@@ -168,7 +170,8 @@ def rerank_with_cross_encoder(query, documents, model, top_k=10):
 
 
 ### 여기서 비교하는 코드에서 여러 모델을 받아서 비교할 수 있도록 수정하기.
-def query_and_respond_reranker_compare(query: str, conn, model, reranker_model, session_id, top_k=3):
+def query_and_respond_reranker_compare(query: str, conn, model, reranker_model, user_id,
+                                       paper_id, top_k=3):
     """
     BGE-M3만 사용한 검색과 BGE-M3 + Cross-Encoder 리랭커를 사용한 검색을 비교합니다.
     :param conn: db 접근
@@ -187,7 +190,8 @@ def query_and_respond_reranker_compare(query: str, conn, model, reranker_model, 
         matches_bge = search_similar_doc(
             query_vector=query_vector,
             conn=conn,
-            session_id=session_id,
+            user_id=user_id,
+            paper_id=paper_id,
             top_k=top_k * 2  # 초기 검색 결과를 더 많이 가져옴
         )
         end_time_bge = time.time()
@@ -334,14 +338,15 @@ def process_query_with_reranking_compare(
         model,
         reranker,
         completion_executor,
-        session_id,
+        user_id,
+        paper_id,
         top_k: int = 3,
         chat_manager = None,
         paper_manager = None,
 ):
     try:
         if is_follow_up_request(query, model):
-            last_response = chat_manager.get_last_response(session_id)
+            last_response = chat_manager.get_last_response(user_id, paper_id)
             if last_response and last_response['type'] in ['unrelated', 'no_result']:
                 return {
                     "type": "unrelated",
@@ -354,15 +359,13 @@ def process_query_with_reranking_compare(
                 }
             
         if is_paper_info_request(query, model):
-            paper_info = paper_manager.get_paper_info(session_id)
+            paper_info = paper_manager.get_paper_info(user_id, paper_info)
             
             if paper_info:
                 title, authors, abstract, year = paper_info
                 paper_info_text = f"""
                 제목: {title}
                 저자: {authors}
-                발행년도: {year}
-                초록: {abstract}
                 """
                 return {
                     "type": "paper_info",
@@ -381,7 +384,8 @@ def process_query_with_reranking_compare(
             matches_bge = search_similar_doc(
                 query_vector=query_vector,
                 conn=conn,
-                session_id=session_id,
+                user_id=user_id,
+                paper_id=paper_id,
                 top_k=top_k * 2
             )
             print(f"BGE 검색 결과 수: {len(matches_bge)}")

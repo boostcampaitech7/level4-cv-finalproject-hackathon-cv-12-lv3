@@ -1,28 +1,28 @@
 from datasets import load_dataset
 from tqdm import tqdm
 from config.config import OCR_CONFIG, API_CONFIG, AI_CONFIG
-from utils import images_to_text, clean_text, chunkify_with_overlap, query_and_respond, MultiChatManager, abstractive_summarization, chunkify_to_num_token
+from utils import pdf_to_image, images_to_text, clean_text, chunkify_to_num_token, query_and_respond, MultiChatManager
 from utils import llm_refine, process_query_with_reranking_compare, extractive_summarization, split_sentences, extract_paper_metadata, group_academic_paragraphs
 from api import EmbeddingAPI, ChatCompletionsExecutor, SummarizationExecutor
 from datebase import DatabaseConnection, DocumentUploader, SessionManager, PaperManager, ChatHistoryManager
 from sentence_transformers import SentenceTransformer, CrossEncoder
-import os, csv
 from pdf2text import Pdf2Text, pdf_to_image
+import os, csv
 from difflib import SequenceMatcher
-from collections import defaultdict
 import sys, json
 import subprocess
+import pandas as pd
 
 # 로그 파일 설정
-log_filename = "log.txt"
+log_filename = "log_paper.txt"
 log_file = open(log_filename, "w", encoding="utf-8")
-sys.stdout = log_file  # 표준 출력을 파일로 리디렉션
+sys.stdout = log_file
 
 def run_translate(file_name):
     command = ["python", "utils/translate.py", file_name]
     subprocess.run(command, capture_output=True, text=True)
-    
-def find_matching_file(domain, target_file_name, base_dir="/data/ephemeral/home/lexxsh/level4-cv-finalproject-hackathon-cv-12-lv3/eval/dataset_Allganize"):
+
+def find_matching_file(domain, target_file_name, base_dir="/data/ephemeral/home/lexxsh/level4-cv-finalproject-hackathon-cv-12-lv3/eval/dataset_paper"):
     domain_dir = os.path.join(base_dir, domain)
     if not os.path.exists(domain_dir):
         raise FileNotFoundError(f"Domain directory not found: {domain_dir}")
@@ -41,27 +41,21 @@ def find_matching_file(domain, target_file_name, base_dir="/data/ephemeral/home/
     else:
         return None
 
-def save_to_csv(data, filename="generated_answers.csv"):
+def save_to_csv(data, filename="generated_answers_paper.csv"):
     with open(filename, mode='w', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
         writer.writerow(["Domain", "Question", "Target Answer", "Generated Answer", "Target File"])
         writer.writerows(data)
 
-if __name__ == '__main__':
-    dataset = load_dataset("allganize/RAG-Evaluation-Dataset-KO")
-    ds = dataset['test'].remove_columns(dataset['test'].column_names[4:])
-    domains = ds['domain']
-    questions = ds['question']
-    target_answers = ds['target_answer']
-    target_file_names = ds['target_file_name']
+def process_csv_data(csv_path):
+    # CSV 파일 읽기
+    df = pd.read_csv(csv_path)
+    print(f"총 {len(df)}개의 데이터를 로드했습니다.")
     
     generated_data = []
     model = SentenceTransformer("dragonkue/bge-m3-ko")
     reranker_model = CrossEncoder("jinaai/jina-reranker-v2-base-multilingual", trust_remote_code=True)
     pdf2text = Pdf2Text(AI_CONFIG["layout_model_path"])
-    
-    CHUNK_SIZE=256
-    
     db_connection = DatabaseConnection()
     conn = db_connection.connect()
     
@@ -79,21 +73,32 @@ if __name__ == '__main__':
         session_manager = SessionManager(conn)
         session_id = session_manager.create_session()
         
-        for domain, question, target_answer, target_file_name in zip(domains, questions, target_answers, target_file_names):
-            print(f"\nDomain: {domain}")
-            print(f"Question: {question}")
-            print(f"Target File Name: {target_file_name}")
+        # DataFrame을 순회하면서 처리
+        for _, row in tqdm(df.iterrows(), total=len(df), desc="Processing documents"):
+            domain = row['domain']
+            question = row['question']
+            target_answer = row['answer']
+            file_name = row['name']
             
-            file_path = find_matching_file(domain, target_file_name)
+            print(f"\nID: {row['id']}")
+            print(f"Domain: {domain}")
+            print(f"Question: {question}")
+            print(f"File Name: {file_name}")
+            print(f"Question Type: {row['question_type']}")
+            print(f"PDF Language: {row['pdf_language']}")
+            print(f"Answer Language: {row['answer_language']}")
+            
+            file_path = find_matching_file(domain, file_name)
             if not file_path:
-                print(f"No matching file found for {target_file_name} in domain {domain}. Skipping this question.")
+                print(f"No matching file found for {file_name} in domain {domain}. Skipping this question.")
                 continue
             
             print(f"Matched File: {file_path}")
             
             images, lang = pdf_to_image(file_path)
             print("PDF를 이미지로 변환하였습니다.")
-            lang = 'korean'
+            chunked_documents = []
+            
             run_translate(file_path)
             with open("new.json", "r", encoding="utf-8") as f:
                 new_data = json.load(f)
@@ -113,7 +118,7 @@ if __name__ == '__main__':
                 
                 if str(i) in new_data:
                     new_text = new_data[str(i)]
-                    new_chunks = chunkify_to_num_token(new_text, CHUNK_SIZE)
+                    new_chunks = chunkify_to_num_token(new_text, 256)
                     for chunk in new_chunks:
                         chunked_documents.append({
                             "page": int(i + 1),
@@ -168,13 +173,6 @@ if __name__ == '__main__':
             multichat = MultiChatManager()
             multichat.initialize_chat("안녕하세요! 저는 논문 도우미 SummarAI입니다.")
             
-            # relevant_response = query_and_respond(
-            #     query=question,
-            #     conn=conn,
-            #     model=model,
-            #     session_id=session_id,
-            #     top_k=5
-            # )
             relevant_response = process_query_with_reranking_compare(
                 query=question,
                 conn=conn,
@@ -184,6 +182,7 @@ if __name__ == '__main__':
                 session_id=session_id,
                 top_k= 3,
             )
+            
             request_data = multichat.prepare_chat_request(question, context=relevant_response)
             
             try:
@@ -191,22 +190,25 @@ if __name__ == '__main__':
                 if response:
                     multichat.process_response(response)
                     gen_answer = response['content']
-                    
-                    # 출력 추가
                     print(f"\nGenerated Answer:\n{gen_answer}\n")
                     
                     gen_answer = response['content'].replace("\n", " ")
-                    generated_data.append([domain, question, target_answer, gen_answer, target_file_name])
+                    generated_data.append([domain, question, target_answer, gen_answer, file_name])
                     multichat.initialize_chat("")
                     
+                    # 각 응답 후 CSV 파일 업데이트
                     save_to_csv(generated_data)
             except Exception as e:
                 print(f"대화 중 오류 발생: {str(e)}")
+
     except Exception as e:
-        print(f"대화 전 오류 발생: {str(e)}")
+        print(f"처리 중 오류 발생: {str(e)}")
     finally:
-        print("END.")
         if conn:
             db_connection.close()
             print("DB connection is closed")
-        log_file.close()  # 로그 파일 닫기
+        log_file.close()
+
+if __name__ == '__main__':
+    csv_path = "/data/ephemeral/home/lexxsh/level4-cv-finalproject-hackathon-cv-12-lv3/eval/dataset_paper/dataset_2.csv" 
+    process_csv_data(csv_path)

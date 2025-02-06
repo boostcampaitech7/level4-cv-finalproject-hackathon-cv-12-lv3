@@ -9,7 +9,7 @@ def extract_keywords(text):
     쉼표가 나오기 전까지를 하나의 키워드로 인식함.
     """
     hashtags = re.findall(r"#([^\n#,]+)", text)  # '#' 이후 쉼표 또는 줄바꿈 전까지 추출
-    return [tag.strip() for tag in hashtags]
+    return [tag.strip() for tag in hashtags][:4]
 
 def timeline(query_list):
     # API 엔드포인트 

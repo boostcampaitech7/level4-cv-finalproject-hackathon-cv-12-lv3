@@ -9,9 +9,9 @@ from config.config import VOICE_CONFIG
 
 import io
 import requests
+from utils.script import write_full_script
 from tqdm import tqdm
 from pydub import AudioSegment  # Import pydub for audio manipulation
-from script import write_full_script
 from http import HTTPStatus  # For better HTTP status code handling
 
 
@@ -109,12 +109,11 @@ def script_to_speech(conversations):
                 continue  # Skip to the next conversation
             haha_audio = haha_audio.fade_in(duration=100).fade_out(duration=100)
             final_audio += haha_audio
-
     return final_audio
 
 if __name__ == "__main__":
     try:
-        text_file_path = "/data/ephemeral/home/YJ/level4-cv-finalproject-hackathon-cv-12-lv3/summary.txt"
+        text_file_path = "/data/ephemeral/home/jm/level4-cv-finalproject-hackathon-cv-12-lv3/summary.txt"
         with open(text_file_path, "r", encoding="utf-8") as file:
             text_content = file.read()
 
