@@ -15,9 +15,12 @@ import traceback
 
 import subprocess
 import json
+
+
 def run_translate(file_name):
     command = ["python", "utils/translate.py", file_name]
     subprocess.run(command, capture_output=True, text=True)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -85,7 +88,7 @@ if __name__ == '__main__':
                 sentences = last_three_sentences + sentences
             chunks = chunkify_to_num_token(sentences, 256)
             for chunk in chunks:
-                    chunked_documents.append({"page": int(i + 1), "chunk": chunk})
+                chunked_documents.append({"page": int(i + 1), "chunk": chunk})
             last_three_sentences = sentences[-3:]
 
             if str(i) in new_data:
@@ -96,11 +99,10 @@ if __name__ == '__main__':
                         "page": int(i + 1),
                         "chunk": chunk
                     })
-        
+
         for doc in tqdm(chunked_documents, desc="Generating Embeddings", total=len(chunked_documents)):
             embedding = model.encode(doc["chunk"])
             doc["embedding"] = embedding.tolist()
-    
 
         db_connection = DatabaseConnection()
         conn = db_connection.connect()

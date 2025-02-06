@@ -1,6 +1,7 @@
 import os
 import torch
 
+from typing import Dict, Any, Optional
 from collections import defaultdict
 from functools import lru_cache
 from hashlib import sha256
@@ -84,6 +85,12 @@ class BaseRequest(BaseModel):
     user_id: str = "admin"
 
 
+class BaseResponse(BaseModel):
+    success: bool
+    message: Optional[str] = None
+    data: Optional[Dict[str, Any]] = None
+
+
 class PdfRequest(BaseRequest):
     @classmethod
     def as_form(
@@ -98,12 +105,12 @@ class ChatRequest(BaseRequest):
     message: str = ""
 
 
-@app.get("/", status_code=status.HTTP_200_OK)
+@app.get("/", response_model=BaseResponse, response_model_exclude_unset=True)
 def test():
-    return {"success": True, "message": "테스트 성공"}
+    return {'success': True, 'message': "테스트 성공"}
 
 
-@app.post("/pdf", status_code=status.HTTP_201_CREATED)
+@app.post("/pdf", response_model=BaseResponse, response_model_exclude_unset=True)
 async def upload_pdf(file: UploadFile,
                      req: PdfRequest = Depends(PdfRequest.as_form),
                      file_manager: FileManager = Depends(get_file_manager)):
@@ -141,7 +148,7 @@ async def upload_pdf(file: UploadFile,
                             detail=f"PDF 업로드 중 오류 발생: {str(e)}")
 
 
-@app.post("/chat-bot", status_code=status.HTTP_200_OK)
+@app.post("/chat-bot", response_model=BaseResponse, response_model_exclude_unset=True)
 async def prepare_chatbot_base(req: PdfRequest,
                                file_manager: FileManager = Depends(
                                    get_file_manager),
@@ -164,11 +171,12 @@ async def prepare_chatbot_base(req: PdfRequest,
             chunked_documents, user_id, pdf_id)
 
     except Exception as e:
-        return {"success": False, "message": f"Fail.. {e}"}
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"Document 업로드 중에 오류 발생 : {str(e)}")
     return {"success": True, "message": "Ready for Chat"}
 
 
-@app.post("/chat-bot/message")
+@app.post("/chat-bot/message", response_model=BaseResponse, response_model_exclude_unset=True)
 async def chat_message(req: ChatRequest,
                        conn=Depends(get_db_connection),
                        paper_manager: PaperManager = Depends(get_paper_manager)):
@@ -256,10 +264,11 @@ async def chat_message(req: ChatRequest,
             return {"success": True, "data": {"message": response}}
 
     except Exception as e:
-        return {"success": False, "message": f"Fail.. {e}"}
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"답변 생성 중 오류 발생 : {str(e)}")
 
 
-@app.post("/table-figure", status_code=status.HTTP_200_OK)
+@app.post("/table-figure", response_model=BaseResponse, response_model_exclude_unset=True)
 async def pdf2text_table_figure(req: PdfRequest,
                                 file_manager: FileManager = Depends(get_file_manager)):
     pdf_id, user_id = req.pdf_id, req.user_id
@@ -267,7 +276,8 @@ async def pdf2text_table_figure(req: PdfRequest,
     pdf_path = file_manager.get_paper(user_id, pdf_id)
 
     if pdf_path is None:
-        return {"success": False, "message": f"PDF with ID {pdf_id} not found or not uploaded yet"}
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"PDF with ID {pdf_id} not found or not uploaded yet")
 
     p2t = Pdf2Text(AI_CONFIG['layout_model_path'])
     pdf_images, lang = pdf_to_image(pdf_path)
@@ -304,7 +314,7 @@ async def pdf2text_table_figure(req: PdfRequest,
 # 요약 및 오디오, 태그, 타임라인 파일 생성하기
 
 
-@app.post("/pdf/summarize", status_code=status.HTTP_200_OK)
+@app.post("/pdf/summarize", response_model=BaseResponse, response_model_exclude_unset=True)
 async def summarize_and_get_files(req: PdfRequest,
                                   file_manager: FileManager = Depends(get_file_manager)):
     pdf_id, user_id = req.pdf_id, req.user_id
@@ -333,7 +343,7 @@ async def get_paper(req: PdfRequest,
 
     if pdf_path:
         return FileResponse(pdf_path, media_type="application/pdf")
-    return {"error": "Paper not found"}
+    return {'success': False, "message": "Paper not found"}
 
 
 @app.get("/pdf/get_figure")
@@ -344,7 +354,7 @@ async def get_figure(req: PdfRequest,
 
     if fig_paths:
         return {"status": "success", "figures": fig_paths}
-    return {"error": "Figures not found"}
+    return {'success': False, "message": "Figures not found"}
 
 
 @app.get("/pdf/get_timeline")
@@ -355,7 +365,7 @@ async def get_timeline(req: PdfRequest,
 
     if timeline_path:
         return FileResponse(timeline_path, media_type="application/json")
-    return {"error": "Timeline not found"}
+    return {'success': False, "message": "Timeline not found"}
 
 
 @app.get("/pdf/get_audio")
@@ -366,7 +376,7 @@ async def get_audio(req: PdfRequest,
 
     if audio_path:
         return FileResponse(audio_path, media_type="audio/mpeg")
-    return {"error": "Audio not found"}
+    return {'success': False, "message": "Audio not found"}
 
 
 @app.get("/pdf/get_thumbnail")
@@ -377,7 +387,7 @@ async def get_thumbnail(req: PdfRequest,
 
     if thumbnail_path:
         return FileResponse(thumbnail_path, media_type="image/png")
-    return {"error": "Thumbnail not found"}
+    return {'success': False, "message": "Thumbnail not found"}
 
 
 @app.get("/pdf/get_script")
@@ -388,7 +398,7 @@ async def get_script(req: PdfRequest,
 
     if script_path:
         return FileResponse(script_path, media_type="application/json")
-    return {"error": "Thumbnail not found"}
+    return {'success': False, "message": "Thumbnail not found"}
 
 
 @app.get("/pdf/get_table")
@@ -398,8 +408,8 @@ async def get_table(req: PdfRequest,
     table_info = additional_uploader.search_table_file(user_id, pdf_id)
 
     if table_info:
-        return {"status": "success", "tables": table_info}
-    return {"status": "error", "message": "Table information not found"}
+        return {'success': True, "data": {"tables": table_info}}
+    return {'success': False, "message": "Table information not found"}
 
 
 # TODO 프론트 메인 화면에서 시작하기를 눌렀을 때 user_id의 history에서 pdf title을 전송해주는 API
