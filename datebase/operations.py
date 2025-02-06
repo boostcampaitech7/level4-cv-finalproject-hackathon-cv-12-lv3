@@ -546,8 +546,8 @@ class AdditionalFileUploader(BaseDBHandler):
             SELECT 
                 storage_path, figure_number, description
             FROM public.figure_info
-            WHERE user_id = user_id
-            AND paper_id = paper_id
+            WHERE user_id = %s
+            AND paper_id = %s
         """
 
         figures = self.execute_query(query, (user_id, paper_id))
@@ -567,8 +567,8 @@ class AdditionalFileUploader(BaseDBHandler):
             SELECT 
                 storage_path, table_name, description
             FROM public.table_info
-            WHERE user_id = user_id
-            AND paper_id = paper_id
+            WHERE user_id = %s
+            AND paper_id = %s
         """
 
         tables = self.execute_query(query, (user_id, paper_id))
@@ -588,8 +588,8 @@ class AdditionalFileUploader(BaseDBHandler):
             SELECT 
                 tag_text
             FROM public.tag_info
-            WHERE user_id = user_id
-            AND paper_id = paper_id
+            WHERE user_id = %s
+            AND paper_id = %s
         """
 
         tags = self.execute_query_one(query, (user_id, paper_id))
@@ -601,8 +601,8 @@ class AdditionalFileUploader(BaseDBHandler):
             SELECT 
                 storage_path, timeline_name, description
             FROM public.timeline_info
-            WHERE user_id = user_id
-            AND paper_id = paper_id
+            WHERE user_id = %s
+            AND paper_id = %s
         """
 
         timeline = self.execute_query_one(query, (user_id, paper_id))

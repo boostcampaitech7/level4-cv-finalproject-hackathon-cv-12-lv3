@@ -6,18 +6,19 @@ from collections import defaultdict
 from functools import lru_cache
 
 from pydantic import BaseModel
-from fastapi import FastAPI, UploadFile, status, Depends
+from fastapi import FastAPI, UploadFile, status, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import HTTPException
+from fastapi.responses import FileResponse
 
-from config.config import AI_CONFIG
+from config.config import AI_CONFIG, API_CONFIG
 from pdf2text import Pdf2Text, pdf_to_image
-from utils import FileManager
+from utils import FileManager, PaperSummarizer
 from utils import model_manager
 from utils import split_sentences, chunkify_to_num_token, chunkify_with_overlap
+from api import EmbeddingAPI, ChatCompletionsExecutor, SummarizationExecutor
 
 from datebase.connection import DatabaseConnection
-from datebase.operations import PaperManager, SessionManager, DocumentUploader
+from datebase.operations import PaperManager, SessionManager, DocumentUploader, AdditionalFileUploader
 
 from sentence_transformers import SentenceTransformer
 
@@ -35,6 +36,25 @@ def get_file_manager(conn = Depends(get_db_connection)):
 
 def get_paper_manager(conn = Depends(get_db_connection)):
     return PaperManager(conn)
+
+def get_add_file_uploader(conn = Depends(get_db_connection)):
+    return AdditionalFileUploader(conn)
+
+embedding_api = EmbeddingAPI(
+    host=API_CONFIG['host2'],
+    api_key=API_CONFIG['api_key'],
+    request_id=API_CONFIG['request_id']
+)
+completion_executor = ChatCompletionsExecutor(
+    host=API_CONFIG['host'],
+    api_key=API_CONFIG['api_key'],
+    request_id=API_CONFIG['request_id']
+)
+summarization_executor = SummarizationExecutor(
+    host=API_CONFIG['host2'],
+    api_key=API_CONFIG['api_key'],
+    request_id=API_CONFIG['request_id']
+)
 
 app = FastAPI()
 # db_connection = DatabaseConnection()
@@ -210,3 +230,86 @@ async def pdf2text_table_figure(req: PdfRequest,
     # TODO 두 작업 모두 종료되면 response 반환
 
     return {"success": True, "message": "여기까지면 정상적으로 온거야 ㅇㅈ? 저장된거 확인해보셈"}
+
+# 요약 및 오디오, 태그, 타임라인 파일 생성하기
+@app.post("/pdf/summarize", status_code=status.HTTP_200_OK)
+async def summarize_and_get_files(req: PdfRequest,
+                                  conn = Depends(get_db_connection),
+                                  file_manager: FileManager = Depends(get_file_manager)):
+    summarizer = PaperSummarizer()
+
+    paper_file = file_manager.get_paper(user_id, req.pdf_id)
+
+    final_summary = summarizer.generate_summary(paper_file)
+    
+    file_manager.extract_summary_content(
+        final_summary=final_summary,
+        completion_executor=completion_executor,
+        user_id=user_id,
+        paper_id=req.pdf_id
+    )
+
+    return {"success": True, "message": "이야 이거 파일 개잘만든다 바로 storage 확인해라 ㅏㅡㅑ"}
+
+@app.get("/pdf/get_paper")
+async def get_paper(req: PdfRequest,
+                    file_manager: FileManager = Depends(get_file_manager)):
+    pdf_path = file_manager.get_paper(user_id, req.pdf_id)
+
+    if pdf_path:
+        return FileResponse(pdf_path, media_type="application/pdf")
+    return {"error": "Paper not found"}
+
+@app.get("/pdf/get_figure")
+async def get_figure(req: PdfRequest,
+                     file_manager: FileManager = Depends(get_file_manager)):
+    fig_paths = file_manager.get_figure(user_id, req.pdf_id)
+
+    if fig_paths:
+        return {"status": "success", "figures": fig_paths}
+    return {"error": "Figures not found"}
+
+@app.get("/pdf/get_timeline")
+async def get_timeline(req: PdfRequest,
+                       file_manager: FileManager = Depends(get_file_manager)):
+    timeline_path = file_manager.get_timeline(user_id, req.pdf_id)
+
+    if timeline_path:
+        return FileResponse(timeline_path, media_type="application/json")
+    return {"error": "Timeline not found"}
+
+@app.get("/pdf/get_audio")
+async def get_audio(req: PdfRequest,
+                    file_manager: FileManager = Depends(get_file_manager)):
+    audio_path = file_manager.get_audio(user_id, req.pdf_id)
+
+    if audio_path:
+        return FileResponse(audio_path, media_type="audio/mpeg")
+    return {"error": "Audio not found"}
+
+@app.get("/pdf/get_thumbnail")
+async def get_thumbnail(req: PdfRequest,
+                        file_manager: FileManager = Depends(get_file_manager)):
+    thumbnail_path = file_manager.get_thumbnail(user_id, req.pdf_id)
+
+    if thumbnail_path:
+        return FileResponse(thumbnail_path, media_type="image/png")
+    return {"error": "Thumbnail not found"}
+
+@app.get("/pdf/get_script")
+async def get_script(req: PdfRequest,
+                     file_manager: FileManager = Depends(get_file_manager)):
+    script_path = file_manager.get_script(user_id, req.pdf_id)
+
+    if script_path:
+        return FileResponse(script_path, media_type="application/json")
+    return {"error": "Thumbnail not found"}
+
+@app.get("/pdf/get_table")
+async def get_table(req: PdfRequest,
+                     additional_uploader: AdditionalFileUploader = Depends(get_add_file_uploader)):
+    table_info = additional_uploader.search_table_file(user_id, req.pdf_id)
+
+    if table_info:
+        return {"status": "success", "tables": table_info}
+    return {"status": "error", "message": "Table information not found"}
