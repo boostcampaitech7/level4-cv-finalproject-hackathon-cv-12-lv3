@@ -1,5 +1,11 @@
 # SummarAI
+![Image](https://github.com/user-attachments/assets/14f4046c-9f1c-4f6d-a74d-899e3b4dc480)
 
+[시연 사이트 링크]()
+## Project Introduction
+### How to
+### Background
+### Features
 
 ## Team Member
 
@@ -29,6 +35,18 @@
         <td>T7158</td>
     </tr>
 </table>
+
+## Project Timeline
+
+## Service Architecture
+
+## Model Architecture
+
+## Development-Collaboration Tools
+
+## Evaluation
+
+## AI Safety?
 
 ## Install
 
