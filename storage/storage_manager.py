@@ -14,10 +14,6 @@ class ObjectStorageManager:
         self.access_key = os.getenv('NCP_ACCESS_KEY')
         self.secret_key = os.getenv('NCP_SECRET_KEY')
 
-        print(f"Access Key: {os.getenv('NCP_ACCESS_KEY')}")
-        print(f"Region: {os.getenv('NCP_REGION')}")
-        print(f"Endpoint: {os.getenv('NCP_ENDPOINT')}")
-
         self.s3_client = boto3.client(
             's3',
             endpoint_url=self.endpoint,
@@ -173,3 +169,17 @@ class ObjectStorageManager:
         except Exception as e:
             print(f"thumbnail 파일 업로드 중 에러 발생: {str(e)}")
             return None
+        
+    def download_file(self, file_url: str, local_path: str, bucket_name: str) -> bool:
+        try:
+            self.s3_client.download_file(
+                Bucket=bucket_name,
+                Key=file_url,
+                Filename=local_path
+            )
+            if os.path.exists(local_path):
+                return True
+            return False
+        except Exception as e:
+            print(f"파일 다운로드 실패: {str(e)}")
+            return False
