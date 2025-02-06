@@ -9,6 +9,7 @@ import psycopg2
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+
 class BaseDBHandler:
     def __init__(self, connection):
         self.conn = connection
@@ -26,7 +27,7 @@ class BaseDBHandler:
             print(f"쿼리 {query} 실행 중 에러 발생: {str(e)}")
             self.conn.rollback()
             return
-        
+
     def execute_query_one(self, query, params=None):
         try:
             with self.conn.cursor() as cur:
@@ -40,6 +41,7 @@ class BaseDBHandler:
             print(f"쿼리 {query} 실행 중 에러 발생: {str(e)}")
             self.conn.rollback()
             return
+
 
 class SessionManager:
     def __init__(self, connection):
@@ -65,19 +67,20 @@ class SessionManager:
         finally:
             cur.close()
 
+
 class UserManager(BaseDBHandler):
     def __init__(self, connection):
         self.conn = connection
 
     def _hash_password(self, password: str) -> str:
         return pwd_context.hash(password)
-    
-    def verify_password(self, plain_password: str, 
+
+    def verify_password(self, plain_password: str,
                         hashed_password: str) -> bool:
         return pwd_context.verify(plain_password, hashed_password)
 
     def create_user(self, user_id: str, user_pw: str,
-                     username: str, birth:datetime):
+                    username: str, birth: datetime):
         hashed_password = self._hash_password(user_pw)
 
         query = """
@@ -86,7 +89,8 @@ class UserManager(BaseDBHandler):
             VALUES (%s, %s, %s, %s)
         """
         try:
-            self.execute_query(query, (user_id, hashed_password, username, birth))
+            self.execute_query(
+                query, (user_id, hashed_password, username, birth))
             return True
         except Exception as e:
             print(f"사용자 생성 중 에러 발생: {str(e)}")
@@ -103,7 +107,7 @@ class UserManager(BaseDBHandler):
 
         if user is None:
             return None
-        
+
         if self.verify_password(user_pw, user[1]):
             return {
                 'user_id': user[0],
@@ -111,18 +115,22 @@ class UserManager(BaseDBHandler):
                 'birth': user[3]
             }
         return None
-    
+
     def user_exists(self, user_id: str) -> bool:
         query = "SELECT 1 FROM public.user_info WHERE user_id = %s"
 
         result = self.execute_query_one(query, (user_id,))
         return result is not None
 
+
 class PaperManager(BaseDBHandler):
     def __init__(self, connection):
         self.conn = connection
 
-    def store_paper_info(self, user_id: str, title: str, author: str = None, 
+    # TODO lang 속성 추가후 초기 저장에는 null값으로
+    # TODO paper info 업데이트 하는 함수 필요
+    # TODO 업데이트 하는 함수를 통해서 lang값 추출 후 적용해야함.
+    def store_paper_info(self, user_id: str, title: str, author: str = None,
                          pdf_file_path: str = None):
         query = """
             INSERT INTO public.papers
@@ -131,9 +139,9 @@ class PaperManager(BaseDBHandler):
             RETURNING paper_id
         """
         return self.execute_query_one(query, (user_id, title, author, pdf_file_path))[0]
-    
+
     def update_tran_pdf_file(self, user_id: str, paper_id: int,
-                              tran_pdf_file_path: str):
+                             tran_pdf_file_path: str):
         query = """
             UPDATE public.papers
             SET tran_pdf_file_path = %s
@@ -151,8 +159,9 @@ class PaperManager(BaseDBHandler):
             WHERE user_id = %s
             AND paper_id = %s
         """
-        self.execute_query(query, (short_summary, long_summary, user_id, paper_id))
-    
+        self.execute_query(
+            query, (short_summary, long_summary, user_id, paper_id))
+
     def get_paper_info(self, user_id: str, paper_id: int):
         query = """
             SELECT 
@@ -164,8 +173,9 @@ class PaperManager(BaseDBHandler):
             AND paper_id = %s
         """
         result = self.execute_query_one(query, (user_id, paper_id))
-        
+
         if result:
+            # TODO lang 속성 추가
             return {
                 'paper_id': result[0],
                 'user_id': result[1],
@@ -180,10 +190,11 @@ class PaperManager(BaseDBHandler):
         else:
             return None
 
+
 class DocumentUploader:
     def __init__(self, connection):
         self.conn = connection
-    
+
     def upload_documents(self, chunked_documents, user_id, paper_id):
         try:
             cur = self.conn.cursor()
@@ -207,6 +218,7 @@ class DocumentUploader:
             raise
         finally:
             cur.close()
+
 
 class ChatHistoryManager:
     def __init__(self, connection, embedding_api, chat_api):
@@ -237,7 +249,7 @@ class ChatHistoryManager:
             """, (user_id, paper_id, role, message, parent_id,
                   is_summary, summary_for_chat_id, context_docs,
                   embedding, chat_type))
-            
+
             chat_id = cur.fetchone()[0]
             self.conn.commit()
             return chat_id
@@ -286,7 +298,7 @@ class ChatHistoryManager:
     def store_summary(self, user_id, paper_id, summary, summarized_chat_ids):
         """ 요약본 저장 """
         try:
-            summary_id =  self.store_chat(
+            summary_id = self.store_chat(
                 user_id=user_id,
                 paper_id=paper_id,
                 role='summary',
@@ -329,7 +341,7 @@ class ChatHistoryManager:
             cur.close()
 
     def find_related_conversations(self, current_question, user_id,
-                                    paper_id, similarity_threshold=0.85):
+                                   paper_id, similarity_threshold=0.85):
         """ 임베딩 유사도 기반 이전 질문 찾기 """
         # current_embedding = self.embedding_api.get_embedding(current_question)
         current_embedding = self.model.encode(current_question).tolist()
@@ -353,7 +365,7 @@ class ChatHistoryManager:
 
         try:
             with self.conn.cursor() as cursor:
-                cursor.execute(query, (current_embedding, user_id, paper_id, current_embedding, 
+                cursor.execute(query, (current_embedding, user_id, paper_id, current_embedding,
                                        similarity_threshold))
                 results = cursor.fetchall()
 
@@ -367,13 +379,13 @@ class ChatHistoryManager:
                             'similarity': similarity
                         })
                         return related_conversations
-                    
+
                 return None
         except Exception as e:
             print(f"쿼리 실행 중 에러 발생: {str(e)}")
-            
+
         return None
-    
+
     def handle_question(self, current_question, user_id, paper_id, context=None):
         """ 질문 처리 메인 로직 """
         if context is None:
@@ -388,8 +400,9 @@ class ChatHistoryManager:
                 'type': 'context',
                 'content': f"Previous related answer:\n{self.cache[cache_key]}"
             }
-        
-        related_conversations = self.find_related_conversations(current_question, user_id, paper_id)
+
+        related_conversations = self.find_related_conversations(
+            current_question, user_id, paper_id)
 
         if related_conversations:
             context = "Related previous conversations:\n"
@@ -400,9 +413,9 @@ class ChatHistoryManager:
                 'type': 'context',
                 'content': context
             }
-        
+
         return None
-    
+
     def get_last_response(self, user_id, paper_id):
         """ 마지막 응답 가져오기 """
         query = """
@@ -433,7 +446,8 @@ class ChatHistoryManager:
         except Exception as e:
             print(f"마지막 응답 조회 중 오류 발생: {str(e)}")
             return None
-    
+
+
 class SearchFileText:
     def __init__(self, connection):
         self.conn = connection
@@ -467,6 +481,7 @@ class SearchFileText:
         finally:
             cur.close()
 
+
 class SummaryFileText(BaseDBHandler):
     def __init__(self, connection):
         self.conn = connection
@@ -478,6 +493,7 @@ class SummaryFileText(BaseDBHandler):
             WHERE user_id = %s AND paper_id = %s
         """
         return self.execute_query_one(query, (user_id, paper_id))
+
 
 class AdditionalFileUploader(BaseDBHandler):
     def __init__(self, connection):
@@ -493,9 +509,7 @@ class AdditionalFileUploader(BaseDBHandler):
         """
 
         self.execute_query_one(query, (user_id, paper_id,
-                                        storage_path, caption_number, description))
-        
-        
+                                       storage_path, caption_number, description))
 
     def insert_table_file(self, user_id, paper_id,
                           table_obj, caption_number, description):
@@ -507,7 +521,7 @@ class AdditionalFileUploader(BaseDBHandler):
         """
 
         self.execute_query_one(query, (user_id, paper_id,
-                                        table_obj, caption_number, description))
+                                       table_obj, caption_number, description))
 
     def insert_tag_file(self, user_id, paper_id,
                         tag_text):
@@ -518,7 +532,7 @@ class AdditionalFileUploader(BaseDBHandler):
         """
 
         self.execute_query_one(query, (user_id, paper_id, tag_text))
-    
+
     def insert_timeline_file(self, user_id, paper_id,
                              storage_path, timeline_name, description):
         query = """
@@ -529,9 +543,9 @@ class AdditionalFileUploader(BaseDBHandler):
         """
 
         self.execute_query_one(query, (user_id, paper_id, storage_path,
-                                         timeline_name, description))
-        
-    def insert_audio(self, user_id, paper_id, audio_file_path, 
+                                       timeline_name, description))
+
+    def insert_audio(self, user_id, paper_id, audio_file_path,
                      thumbnail_path, audio_title, script):
         query = """
             INSERT INTO public.audio_info
@@ -539,9 +553,8 @@ class AdditionalFileUploader(BaseDBHandler):
             thumbnail_path, audio_title, script)
             VALUES (%s, %s, %s, %s, %s, %s)
         """
-        self.execute_query(query, (user_id, paper_id, audio_file_path, 
+        self.execute_query(query, (user_id, paper_id, audio_file_path,
                                    thumbnail_path, audio_title, script))
-        
 
     def search_figure_file(self, user_id, paper_id):
         query = """
@@ -618,7 +631,7 @@ class AdditionalFileUploader(BaseDBHandler):
             return result
         else:
             return None
-        
+
     def search_audio_file(self, user_id, paper_id):
         query = """
             SELECT

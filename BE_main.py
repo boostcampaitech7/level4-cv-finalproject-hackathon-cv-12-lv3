@@ -3,6 +3,7 @@ import torch
 
 from collections import defaultdict
 from functools import lru_cache
+from hashlib import sha256
 
 from pydantic import BaseModel
 from fastapi import FastAPI, UploadFile, status, Depends, HTTPException, Form
@@ -14,12 +15,13 @@ from pdf2text import Pdf2Text, pdf_to_image
 from utils import FileManager, MultiChatManager, PaperSummarizer
 # from utils.model_manager import model_manager
 from utils import split_sentences, chunkify_to_num_token, chunkify_with_overlap
+from utils import process_query_with_reranking_compare
 from api import EmbeddingAPI, ChatCompletionsExecutor, SummarizationExecutor
 
 from datebase.connection import DatabaseConnection
 from datebase.operations import PaperManager, DocumentUploader, ChatHistoryManager, AdditionalFileUploader
 
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer, CrossEncoder
 
 
 @lru_cache()
@@ -61,6 +63,11 @@ summarization_executor = SummarizationExecutor(
     request_id=API_CONFIG['request_id']
 )
 
+multi_chat_manager = MultiChatManager()
+chat_history_manager = ChatHistoryManager(
+    get_db_connection(), embedding_api, completion_executor
+)
+
 app = FastAPI()
 
 app.add_middleware(
@@ -72,10 +79,12 @@ app.add_middleware(
 )
 
 
-class PdfRequest(BaseModel):
+class BaseRequest(BaseModel):
     pdf_id: int
-    user_id: str = 'admin'
+    user_id: str = "admin"
 
+
+class PdfRequest(BaseRequest):
     @classmethod
     def as_form(
         cls,
@@ -83,6 +92,10 @@ class PdfRequest(BaseModel):
         pdf_id: int = Form(0)
     ):
         return cls(user_id=user_id, pdf_id=pdf_id)
+
+
+class ChatRequest(BaseRequest):
+    message: str = ""
 
 
 @app.get("/", status_code=status.HTTP_200_OK)
@@ -139,7 +152,7 @@ async def prepare_chatbot_base(req: PdfRequest,
     if pdf_path is None:
         return {"success": False, "message": f"PDF with ID {pdf_id} not found or not uploaded yet"}
 
-    sentences = pdf2text_recognize(pdf_path)
+    sentences, lang = pdf2text_recognize(pdf_path)
 
     if os.path.exists(pdf_path):
         os.remove(pdf_path)
@@ -153,6 +166,97 @@ async def prepare_chatbot_base(req: PdfRequest,
     except Exception as e:
         return {"success": False, "message": f"Fail.. {e}"}
     return {"success": True, "message": "Ready for Chat"}
+
+
+@app.post("/chat-bot/message")
+async def chat_message(req: ChatRequest,
+                       conn=Depends(get_db_connection),
+                       paper_manager: PaperManager = Depends(get_paper_manager)):
+    pdf_id, user_id, user_input = req.pdf_id, req.user_id, req.message
+
+    multi_chat_manager.initialize_chat("")
+
+    model = SentenceTransformer("dragonkue/bge-m3-ko")
+    reranker_model = CrossEncoder(
+        "jinaai/jina-reranker-v2-base-multilingual", trust_remote_code=True)
+
+    # paper_info = paper_manager.get_paper_info(user_id, pdf_id)
+
+    relevant_response = process_query_with_reranking_compare(
+        query=user_input,
+        conn=conn,
+        model=model,
+        reranker=reranker_model,
+        completion_executor=completion_executor,
+        user_id=user_id,
+        paper_id=pdf_id,
+        top_k=3,  # NOTE 함수 변경되면 아래 주석으로 진행
+        # top_k=3 if paper_info['lang'] == 'en' else 2,
+        chat_manager=chat_history_manager
+    )
+
+    context_result = chat_history_manager.handle_question(
+        user_input, user_id=user_id, paper_id=pdf_id)
+
+    if relevant_response is not None:
+        if relevant_response['type'] == "reference":
+            context = {
+                "type": relevant_response['type'],
+                "content": f"{context_result['content']}\n{relevant_response['content']}" if
+                context_result else relevant_response['content']
+            }
+        elif relevant_response['type'] in ["unrelated", "no_result"]:
+            context = {
+                "type": relevant_response['type'],
+                "content": relevant_response['message']
+            }
+        else:
+            context = {
+                "type": relevant_response['type'],
+                "content": relevant_response['message']
+            }
+    else:
+        context = {"type": "unrelated",
+                   "content": "이 질문은 논문과 관련이 없어요. 논문에 대한 질문을 해주시면 도와드릴게요!"}
+
+    cache_key = f"{user_id}:{pdf_id}:{user_input}:{sha256(context['content'].encode()).hexdigest()}"
+
+    if cache_key in chat_history_manager.cache:
+        cached_response = chat_history_manager.cache[cache_key]
+        request_data = multi_chat_manager.prepare_chat_request(
+            user_input,
+            f"캐시된 응답:\n{cached_response}"
+        )
+    else:
+        request_data = multi_chat_manager.prepare_chat_request(
+            user_input,
+            context
+        )
+    try:
+        response = completion_executor.execute(
+            request_data, stream=True
+        )
+
+        if response:
+            multi_chat_manager.process_response(response)
+            current_embedding = embedding_api.get_embedding(user_input)
+
+            chat_history_manager.store_conversation(
+                user_id=user_id,
+                paper_id=pdf_id,
+                user_message=user_input,
+                llm_response=response['content'],
+                embedding=current_embedding,
+                chat_type=context['type']
+            )
+
+            chat_history_manager.add_to_cache(
+                user_id, pdf_id, user_input, context, response['content']
+            )
+            return {"success": True, "data": {"message": response}}
+
+    except Exception as e:
+        return {"success": False, "message": f"Fail.. {e}"}
 
 
 @app.post("/table-figure", status_code=status.HTTP_200_OK)
@@ -298,6 +402,10 @@ async def get_table(req: PdfRequest,
     return {"status": "error", "message": "Table information not found"}
 
 
+# TODO 프론트 메인 화면에서 시작하기를 눌렀을 때 user_id의 history에서 pdf title을 전송해주는 API
+
+# TODO history에서 해당 pdf를 눌렀을 때 pdf와 번역본, chat history를 전송해주는 API
+
 def pdf2text_recognize(pdf):
     p2t = Pdf2Text(AI_CONFIG['layout_model_path'])
 
@@ -313,7 +421,7 @@ def pdf2text_recognize(pdf):
     for idx in range(1, len(sentences)):
         sentences[idx] = sentences[idx - 1][-3:] + sentences[idx]
 
-    return sentences
+    return sentences, lang
 
 
 def chunking_embedding(sentences, size=256):
