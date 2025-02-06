@@ -9,6 +9,7 @@ from .script import write_full_script
 from .audiobook_test import script_to_speech
 import os
 import json
+import random
 
 load_dotenv()
 
@@ -165,8 +166,15 @@ class FileManager:
                 json.dump(conversations, f, ensure_ascii=False)
 
             temp_audio_path = f"temp_audio_{paper_id}.mp3"
-            # temp_thumbnail_path = f"temp_thumbnail_{paper_id}.png"
             final_audio.export(temp_audio_path, format="mp3")
+
+            temp_thumbnail_path = self.make_thumbnail(user_id, paper_id)
+
+            if temp_thumbnail_path:
+                thumbnail_storage_info = self.storage_manager.upload_thumbnail(
+                    file_path=temp_thumbnail_path,
+                    bucket_name=os.getenv('NCP_BUCKET_NAME')
+                )
 
             conversation_storage_info = self.storage_manager.upload_script(
                 file_path=temp_script_path,
@@ -178,22 +186,18 @@ class FileManager:
                 bucket_name=os.getenv('NCP_BUCKET_NAME')
             )
 
-            # thumbnal_storage_info = self.storage_manager.upload_thumbnail(
-            #     file_path=temp_thumbnail_path,
-            #     bucket_name=os.getenv('NCP_BUCKET_NAME')
-            # )
-
             self.additional_manager.insert_audio(
                 user_id=user_id,
                 paper_id=paper_id,
                 audio_file_path=audio_storage_info['path'],
-                thumbnail_path=None,
+                thumbnail_path=thumbnail_storage_info['path'] if temp_thumbnail_path else None,
                 audio_title=f"Audio Summary of Paper {paper_id}",
                 script=conversation_storage_info['path']
             )
 
             os.remove(temp_audio_path)
-            # os.remove(temp_thumbnail_path)
+            if temp_thumbnail_path:
+                os.remove(temp_thumbnail_path)
             os.remove(temp_timeline_path)
             os.remove(temp_script_path)
 
@@ -251,7 +255,7 @@ class FileManager:
                     'caption': figure.get('description', '')
                 })
             
-            return temp_path
+            return figure_paths
         except Exception as e:
             print(f"Figure 가져오기 실패: {str(e)}")
             return None
@@ -287,7 +291,7 @@ class FileManager:
             
             temp_path = f"temp_audio_{paper_id}.json"
             downloaded = self.storage_manager.download_file(
-                file_url=audio_info['storage_path'],
+                file_url=audio_info['audio_file_path'],
                 local_path=temp_path,
                 bucket_name=os.getenv('NCP_BUCKET_NAME')
             )
@@ -298,6 +302,28 @@ class FileManager:
             return temp_path
         except Exception as e:
             print(f"audio 가져오기 실패: {str(e)}")
+            return None
+        
+    def get_thumbnail(self, user_id: str, paper_id: str):
+        """ Thumbnail 가져오기 """
+        try:
+            thumbnail_info = self.additional_manager.search_audio_file(user_id, paper_id)
+            if not thumbnail_info:
+                raise Exception("Thumbnail not found")
+            
+            temp_path = f"temp_thumbnail_{paper_id}.json"
+            downloaded = self.storage_manager.download_file(
+                file_url=thumbnail_info['thumbnail_path'],
+                local_path=temp_path,
+                bucket_name=os.getenv('NCP_BUCKET_NAME')
+            )
+
+            if not downloaded:
+                raise Exception("Thumbnail 다운로드 실패")
+            
+            return temp_path
+        except Exception as e:
+            print(f"Thumbnail 가져오기 실패: {str(e)}")
             return None
         
     def get_script(self, user_id: str, paper_id: str):
@@ -320,4 +346,33 @@ class FileManager:
             return temp_path
         except Exception as e:
             print(f"Script 가져오기 실패: {str(e)}")
+            return None
+        
+    def make_thumbnail(self, user_id: str, paper_id: str) -> str:
+        """ Thumbnail 추출하기 """
+        try:
+            figure_info = self.additional_manager.search_figure_file(user_id, paper_id)
+
+            if figure_info and len(figure_info) > 0:
+                selected_figure = random.choice(figure_info)
+                temp_thumbnail_path = f"temp_thumbnail_{paper_id}_{figure_info['figure_number']}.png"
+
+                downloaded = self.storage_manager.download_file(
+                    file_url=selected_figure['storage_path'],
+                    local_path=temp_thumbnail_path,
+                    bucket_name=os.getenv('NCP_BUCKET_NAME')
+                )
+
+                if downloaded:
+                    return temp_thumbnail_path
+                
+            default_downloaded = self.storage_manager.download_file(
+                file_url="my_friend.png",
+                local_path="my_friend.png",
+                bucket_name=os.getenv('NCP_BUCKET_NAME')
+            )
+
+            return default_downloaded
+        except Exception as e:
+            print(f"Thumbnail 생성 실패: {str(e)}")
             return None
