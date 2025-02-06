@@ -203,8 +203,3 @@ class MultiChatManager:
                 print(f"응답 처리 중 오류 발생: {str(e)}")
                 return False
         return False
-    
-    def check_token_limit(self, max_tokens):
-        """ 토큰 제한 체크"""
-        token_limit = 4096 - max_tokens
-        return self.session_state['total_tokens'] > token_limit

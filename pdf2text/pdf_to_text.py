@@ -85,7 +85,7 @@ class Pdf2Text(object):
             else:  # 나머지 타입은 처리하지않는 유형이므로 무시
                 pass
 
-        # unmatch_res
+        # unmatch_res -> dict
         # 'caption' : 매칭되지 않은 caption , 'obj' : 매칭되지 않은 Figure or Table
         # 하위 속성 'item' : text or obj, 'bbox' : bbox 값, 'type' : 해당 객체의 type
 
@@ -102,7 +102,7 @@ class Pdf2Text(object):
 
         # TODO 분리해낸 Table, Figure를 어떤 방식으로 제공할 것인가?
 
-        return " ".join(final_outputs)
+        return " ".join(final_outputs), match_res, unmatch_res
 
     def recognize_only_text(self, image, lang, **kwargs):
         if isinstance(image, Image.Image):
