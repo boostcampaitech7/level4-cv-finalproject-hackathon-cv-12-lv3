@@ -21,7 +21,7 @@ from google.cloud import texttospeech
 GCP_API_KEY = os.getenv("GCP_API_KEY")
 
 # 서비스 계정 키 환경 변수 설정
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/path/your/json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/data/ephemeral/home/jm/level4-cv-finalproject-hackathon-cv-12-lv3/famous-sandbox-444912-s5-293b5f9718ab.json"
 
 def synthesize_text(text, voice_type="speaker1"):
     """Google Cloud TTS를 사용하여 텍스트를 음성으로 변환하는 함수"""
