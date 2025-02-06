@@ -143,14 +143,15 @@ class PaperManager(BaseDBHandler):
         self.execute_query(query, (tran_pdf_file_path, user_id, paper_id))
 
     def update_summary(self, user_id: str, paper_id: int,
-                       summary: str):
+                       short_summary: str, long_summary: str):
         query = """
             UPDATE public.papers
-            SET summary = %s
+            SET short_summary = %s,
+                long_summary = %s
             WHERE user_id = %s
             AND paper_id = %s
         """
-        self.execute_query(query, (summary, user_id, paper_id))
+        self.execute_query(query, (short_summary, long_summary, user_id, paper_id))
     
     def get_paper_info(self, user_id: str, paper_id: int):
         query = """

@@ -28,7 +28,8 @@ try:
                 uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 pdf_file_path TEXT NULL,
                 tran_pdf_file_path TEXT NULL,
-                summary TEXT NULL
+                short_summary TEXT NULL,
+                long_summary TEXT NULL
             );
         """)
     conn.commit()
