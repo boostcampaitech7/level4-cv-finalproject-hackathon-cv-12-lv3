@@ -103,7 +103,8 @@ class FileManager:
             self.paper_manager.update_summary(
                 user_id,
                 paper_id,
-                summary=res1
+                short_summary=res1,
+                result=result
             )
 
             # 2. 키워드/태그 저장
