@@ -1,5 +1,5 @@
 import json
-from api import ChatCompletionsExecutor
+
 
 class MultiChatManager:
     def __init__(self):
@@ -92,7 +92,7 @@ class MultiChatManager:
             - 이전이 unrelated/no_result면 설명 거절
             """
         }
-        
+
         eval_system_message = {
             "role": "system",
             "content": "\n".join([
@@ -132,7 +132,8 @@ class MultiChatManager:
         self.session_state['preset_messages'] = current_messages
         self.session_state['chat_log'].append(user_message)
 
-        current_tokens = sum(len(msg["content"].split()) for msg in self.session_state['preset_messages'])
+        current_tokens = sum(len(msg["content"].split())
+                             for msg in self.session_state['preset_messages'])
 
         available_tokens = 4096 - current_tokens
         max_response_tokens = min(1024, available_tokens - 100)
@@ -148,21 +149,25 @@ class MultiChatManager:
             "includeAiFilters": True,
             "seed": 0,
         }
-    
+
     def process_response(self, response):
         """ 응답 처리 및 상태 업데이트 """
         if response:
             try:
                 if isinstance(response, str) and 'event:result' in response:
-                    result_lines = [line for line in response.split('\n') if 'event:result' in line or 'data:' in line]
+                    result_lines = [line for line in response.split(
+                        '\n') if 'event:result' in line or 'data:' in line]
                     for line in result_lines:
                         if 'data:' in line:
-                            result_data = json.loads(line.replace('data:', '').strip())
+                            result_data = json.loads(
+                                line.replace('data:', '').strip())
                             if 'message' in result_data:
                                 response_text = result_data['message']['content']
-                                input_length = result_data.get('inputLength', 0)
-                                output_length = result_data.get('outputLength', 0)
-                                
+                                input_length = result_data.get(
+                                    'inputLength', 0)
+                                output_length = result_data.get(
+                                    'outputLength', 0)
+
                                 self.session_state['last_response'] = response_text
                                 self.session_state['last_assistant_message'] = {
                                     "role": "assistant",
@@ -176,13 +181,14 @@ class MultiChatManager:
                                     self.session_state['last_assistant_message']
                                 )
 
-                                self.session_state['total_tokens'] = input_length + output_length
+                                self.session_state['total_tokens'] = input_length + \
+                                    output_length
                                 return True
                 else:
                     response_text = response['context']
                     input_length = response.get('inputLength', 0)
                     output_length = response.get('outputLength', 0)
-                    
+
                     self.session_state['last_response'] = response_text
                     self.session_state['last_assistant_message'] = {
                         "role": "assistant",
@@ -196,9 +202,10 @@ class MultiChatManager:
                         self.session_state['last_assistant_message']
                     )
 
-                    self.session_state['total_tokens'] = input_length + output_length
+                    self.session_state['total_tokens'] = input_length + \
+                        output_length
                     return True
-                    
+
             except Exception as e:
                 print(f"응답 처리 중 오류 발생: {str(e)}")
                 return False

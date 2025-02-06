@@ -15,17 +15,20 @@ import tempfile
 load_dotenv()
 
 # save_files.py
+
+
 class FileManager:
     def __init__(self, conn):
         self.conn = conn
         self.storage_manager = ObjectStorageManager()
         self.paper_manager = PaperManager(conn)
-        self.additional_manager= AdditionalFileUploader(conn)
+        self.additional_manager = AdditionalFileUploader(conn)
         self.document_manager = DocumentUploader(conn)
 
     def store_paper(self, file_input, paper_info: Dict, user_id) -> str:
         if isinstance(file_input, bytes):
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf', mode='wb')
+            temp_file = tempfile.NamedTemporaryFile(
+                delete=False, suffix='.pdf', mode='wb')
             temp_file.write(file_input)
             temp_file.close()
             file_path = temp_file.name
@@ -34,20 +37,20 @@ class FileManager:
             file_path = file_input
         else:
             raise TypeError("file_input must be either bytes or str")
-        
+
         try:
             # Object Storage에 PDF 저장
             storage_info = self.storage_manager.upload_pdf(
                 file_path=file_path,
                 bucket_name=os.getenv('NCP_BUCKET_NAME')
             )
-            
+
             if not storage_info:
                 raise Exception("PDF 저장 실패")
-            
+
             if isinstance(file_input, bytes):
                 os.unlink(file_path)
-            
+
             # DB에 논문 정보 저장
             paper_id = self.paper_manager.store_paper_info(
                 user_id=user_id,
@@ -55,13 +58,13 @@ class FileManager:
                 author=paper_info['authors'],
                 pdf_file_path=storage_info['path']
             )
-            
+
             return paper_id
         except Exception as e:
             if isinstance(file_input, bytes) and 'file_path' in locals():
                 os.unlink(file_path)
             raise e
-    
+
     def update_translated_paper(self, file_path, user_id, paper_id):
         """번역 PDF 저장"""
         storage_info = self.storage_manager.upload_pdf(
@@ -71,7 +74,7 @@ class FileManager:
 
         if not storage_info:
             raise Exception("번역 PDF 저장 실패")
-        
+
         self.paper_manager.update_tran_pdf_file(
             user_id=user_id,
             paper_id=paper_id,
@@ -126,19 +129,21 @@ class FileManager:
                         chunked_documents.append(table_doc)
 
                 if chunked_documents:
-                    self.document_manager.upload_documents(chunked_documents, user_id, paper_id)
+                    self.document_manager.upload_documents(
+                        chunked_documents, user_id, paper_id)
 
             return True
         except Exception as e:
             print(f"Figure/Table 저장 중 에러 발생: {str(e)}")
             return False
-        
+
     def extract_summary_content(self, final_summary, completion_executor,
                                 user_id, paper_id):
         """요약 ~ 오디오 생성까지 일괄로 진행하는 코드"""
         try:
             # 1. 요약 생성 및 저장
-            result = abstractive_summarization(final_summary, completion_executor)
+            result = abstractive_summarization(
+                final_summary, completion_executor)
             res1, res2 = result.split("\n", 1)
 
             # 요약 정보 업데이트
@@ -225,7 +230,7 @@ class FileManager:
         except Exception as e:
             print(f"콘텐츠 처리 및 저장 중 에러 발생: {str(e)}")
             return False
-        
+
     def get_paper(self, user_id: str, paper_id: int) -> str:
         """Storage에서 PDF 파일 가져오는 메서드"""
         try:
@@ -233,7 +238,7 @@ class FileManager:
 
             if not paper_info:
                 raise Exception("Paper not found")
-            
+
             temp_path = f"temp_paper_{paper_id}.pdf"
             downloaded = self.storage_manager.download_file(
                 file_url=paper_info['pdf_file_path'],
@@ -243,19 +248,20 @@ class FileManager:
 
             if not downloaded:
                 raise Exception("Figure 다운로드 실패")
-            
+
             return temp_path
         except Exception as e:
             print(f"Figure 가져오기 실패: {str(e)}")
             return None
-        
+
     def get_figure(self, user_id: str, paper_id: str):
         """ Figure 가져오기"""
         try:
-            figure_info = self.additional_manager.search_figure_file(user_id, paper_id)
+            figure_info = self.additional_manager.search_figure_file(
+                user_id, paper_id)
             if not figure_info:
                 raise Exception("Figure not found")
-            
+
             figure_paths = []
             for figure in figure_info:
                 temp_path = f"temp_figure_{paper_id}_{figure['figure_number']}.png"
@@ -274,19 +280,20 @@ class FileManager:
                     'figure_number': figure['figure_number'],
                     'caption': figure.get('description', '')
                 })
-            
+
             return figure_paths
         except Exception as e:
             print(f"Figure 가져오기 실패: {str(e)}")
             return None
-        
+
     def get_timeline(self, user_id: str, paper_id: str):
         """ Timeline 가져오기 """
         try:
-            timeline_info = self.additional_manager.search_timeline_file(user_id, paper_id)
+            timeline_info = self.additional_manager.search_timeline_file(
+                user_id, paper_id)
             if not timeline_info:
                 raise Exception("Timeline not found")
-            
+
             temp_path = f"temp_timeline_{paper_id}.json"
             downloaded = self.storage_manager.download_file(
                 file_url=timeline_info['storage_path'],
@@ -296,19 +303,20 @@ class FileManager:
 
             if not downloaded:
                 raise Exception("Timeline 다운로드 실패")
-            
+
             return temp_path
         except Exception as e:
             print(f"Timeline 가져오기 실패: {str(e)}")
             return None
-        
+
     def get_audio(self, user_id: str, paper_id: str):
         """ audio 가져오기 """
         try:
-            audio_info = self.additional_manager.search_audio_file(user_id, paper_id)
+            audio_info = self.additional_manager.search_audio_file(
+                user_id, paper_id)
             if not audio_info:
                 raise Exception("Audio not found")
-            
+
             temp_path = f"temp_audio_{paper_id}.json"
             downloaded = self.storage_manager.download_file(
                 file_url=audio_info['audio_file_path'],
@@ -318,19 +326,20 @@ class FileManager:
 
             if not downloaded:
                 raise Exception("Audio 다운로드 실패")
-            
+
             return temp_path
         except Exception as e:
             print(f"audio 가져오기 실패: {str(e)}")
             return None
-        
+
     def get_thumbnail(self, user_id: str, paper_id: str):
         """ Thumbnail 가져오기 """
         try:
-            thumbnail_info = self.additional_manager.search_audio_file(user_id, paper_id)
+            thumbnail_info = self.additional_manager.search_audio_file(
+                user_id, paper_id)
             if not thumbnail_info:
                 raise Exception("Thumbnail not found")
-            
+
             temp_path = f"temp_thumbnail_{paper_id}.json"
             downloaded = self.storage_manager.download_file(
                 file_url=thumbnail_info['thumbnail_path'],
@@ -340,19 +349,20 @@ class FileManager:
 
             if not downloaded:
                 raise Exception("Thumbnail 다운로드 실패")
-            
+
             return temp_path
         except Exception as e:
             print(f"Thumbnail 가져오기 실패: {str(e)}")
             return None
-        
+
     def get_script(self, user_id: str, paper_id: str):
         """ Script 가져오기 """
         try:
-            script_info = self.additional_manager.search_audio_file(user_id, paper_id)
+            script_info = self.additional_manager.search_audio_file(
+                user_id, paper_id)
             if not script_info:
                 raise Exception("Script not found")
-            
+
             temp_path = f"temp_script_{paper_id}.json"
             downloaded = self.storage_manager.download_file(
                 file_url=script_info['script'],
@@ -362,16 +372,17 @@ class FileManager:
 
             if not downloaded:
                 raise Exception("Script 다운로드 실패")
-            
+
             return temp_path
         except Exception as e:
             print(f"Script 가져오기 실패: {str(e)}")
             return None
-        
+
     def make_thumbnail(self, user_id: str, paper_id: str) -> str:
         """ Thumbnail 추출하기 """
         try:
-            figure_info = self.additional_manager.search_figure_file(user_id, paper_id)
+            figure_info = self.additional_manager.search_figure_file(
+                user_id, paper_id)
 
             if figure_info and len(figure_info) > 0:
                 selected_figure = random.choice(figure_info)
@@ -383,7 +394,7 @@ class FileManager:
                     bucket_name=os.getenv('NCP_BUCKET_NAME')
                 ):
                     return temp_thumbnail_path
-            
+
             # 기본 썸네일 다운로드 시도
             default_thumbnail_path = "my_friend.png"
             if self.storage_manager.download_file(
@@ -392,7 +403,7 @@ class FileManager:
                 bucket_name=os.getenv('NCP_BUCKET_NAME')
             ):
                 return default_thumbnail_path
-                
+
             return None  # 다운로드 실패시 None 반환
         except Exception as e:
             print(f"Thumbnail 생성 실패: {str(e)}")
