@@ -66,20 +66,26 @@
 
 
 ## Service Architecture
-![image](https://github.com/user-attachments/assets/5220c846-2858-4521-8d8a-73ae1ec235dc)
-
 우선 논문 PDF 파일을 업로드하여 텍스트 및 이미지 데이터를 추출합니다. 벡터 데이터베이스에서는 추출된 데이터를 벡터 형태로 저장하고, 사용자 질의와 유사한 벡터를 검색합니다. 챗봇 인터페이스를 통해 사용자는 논문에 대한 질문을 하고, Vector DB에서 검색된 답변을 제공받습니다. 추가로, AI 모델의 답변에 대한 안전성 검사를 통해 부적절한 답변을 필터링합니다.
 
-<img width="982" alt="image" src="https://github.com/user-attachments/assets/1c330dd1-457c-46cf-83cf-741a6509557f" />
-
+![image](https://github.com/user-attachments/assets/5220c846-2858-4521-8d8a-73ae1ec235dc)
 
 요약 페이지에서는 논문 요약 정보, 연구 분야, 방법론, 결과 등을 제공하고, 유사 논문을 추천합니다.
 
-<img width="1023" alt="image" src="https://github.com/user-attachments/assets/bccbbd56-4953-4638-8564-cdf0fde5064a" />
+<img width="982" alt="image" src="https://github.com/user-attachments/assets/1c330dd1-457c-46cf-83cf-741a6509557f" />
 
 오디오 페이지에서는 논문 내용을 요약한 오디오 콘텐츠와 스크립트 텍스트를 제공합니다.
 
+<img width="1023" alt="image" src="https://github.com/user-attachments/assets/bccbbd56-4953-4638-8564-cdf0fde5064a" />
+
 ## Model Architecture
+모델 파이프라인은 크게 PDF-to-Text 모듈, 요약 모듈로 나뉩니다.
+- PDF-to-Text 모듈은 PDF를 입력으로 받아, 텍스트, 이미지, 테이블로 분리하고, 각각을 OCR 모델을 통해 처리합니다.
+- 내용 인식: DocLayout-YOLO 모델 사용
+- Text OCR: Table Transformer
+- Image OCR: **DeepSeek-VL**
+- Formula OCR: YOLO, PaddleOCR, Mathematical Formula Recognition(MFR)
+- 이후 정확성 증가를 위해 번역 모델을 추가로 사용하며, 번역 내용도 추가적인 출력으로 제공합니다.
 ![image](https://github.com/user-attachments/assets/3394684f-caeb-4d85-896a-c23d8102a9f5)
 
 
