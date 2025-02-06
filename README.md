@@ -1,5 +1,7 @@
 # SummarAI
-![image](https://github.com/user-attachments/assets/58accbd7-ad6d-41a2-bba8-deca332bfa02)
+![image](https://github.com/user-attachments/assets/c0a29b43-f7da-405a-9a26-c6319d16c6e1)
+
+<img src="https://github.com/user-attachments/assets/c0a29b43-f7da-405a-9a26-c6319d16c6e1" alt="thumbnail" width="1200">
 
 
 
