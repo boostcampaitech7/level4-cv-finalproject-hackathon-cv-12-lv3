@@ -94,9 +94,9 @@ if __name__ == '__main__':
             images, lang = pdf_to_image(file_path)
             print("PDF를 이미지로 변환하였습니다.")
             lang = 'korean'
-            run_translate(file_path)
-            with open("new.json", "r", encoding="utf-8") as f:
-                new_data = json.load(f)
+            # run_translate(file_path)
+            # with open("new.json", "r", encoding="utf-8") as f:
+            #     new_data = json.load(f)
                 
             chunked_documents = []
             last_three_sentences = []
@@ -111,14 +111,14 @@ if __name__ == '__main__':
                         chunked_documents.append({"page": int(i + 1), "chunk": chunk})
                 last_three_sentences = sentences[-3:]
                 
-                if str(i) in new_data:
-                    new_text = new_data[str(i)]
-                    new_chunks = chunkify_to_num_token(new_text, CHUNK_SIZE)
-                    for chunk in new_chunks:
-                        chunked_documents.append({
-                            "page": int(i + 1),
-                            "chunk": chunk
-                        })
+                # if str(i) in new_data:
+                #     new_text = new_data[str(i)]
+                #     new_chunks = chunkify_to_num_token(new_text, CHUNK_SIZE)
+                #     for chunk in new_chunks:
+                #         chunked_documents.append({
+                #             "page": int(i + 1),
+                #             "chunk": chunk
+                #         })
                 matched_res, unmatched_res = pdf2text.recognize_only_table_figure(image, lang)
                 
                 #매칭된 테이블 그대로 넣어주기.
