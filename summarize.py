@@ -2,14 +2,12 @@ from langchain.document_loaders import PyPDFLoader
 from summarizer import Summarizer
 
 from transformers import *
-from utils import abstractive_summarization, extract_keywords, timeline
+from utils import abstractive_summarization, extract_keywords, timeline_str, abstractive_timeline
 
-from config.config import AI_CONFIG, API_CONFIG
+from config.config import API_CONFIG
 
-from api import EmbeddingAPI, ChatCompletionsExecutor
-
-import spacy
-import requests
+from api import ChatCompletionsExecutor
+import json
 import networkx as nx
 import sys
 import os
@@ -29,7 +27,7 @@ custom_model = AutoModel.from_pretrained('allenai/scibert_scivocab_uncased', con
 model = Summarizer(custom_model=custom_model, custom_tokenizer=custom_tokenizer)
 
 # PDF 파일 경로 설정
-pdf_filepath = '/data/ephemeral/home/A_survey_of_3d_Gaussian_Splatting.pdf'
+pdf_filepath = '/data/ephemeral/home/lexxsh/level4-cv-finalproject-hackathon-cv-12-lv3/eval/dataset_paper/bio/PET 분해효소 과발현 전 세포 촉매.pdf'
 
 # PyPDFLoader를 사용하여 PDF 파일 로드
 loader = PyPDFLoader(pdf_filepath)
@@ -92,6 +90,14 @@ result = abstractive_summarization(final_summary, completion_executor)
 
 ##추출된 요약이라고 가정 (키워드 포함)
 query_list = extract_keywords(result)
+print(f"태그 : {query_list}")
+
 ## 키워드 검색, JSON 파일 저장
-timeline(query_list)
-print(result)
+str= timeline_str(query_list)
+print(f"str : {str}")
+
+final_result = f"키워드 : {query_list}\n" + str
+
+gemini_json = abstractive_timeline(str)
+print(f"result : {gemini_json}")
+
