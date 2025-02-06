@@ -70,7 +70,7 @@ def abstractive_summarization(extracted_sentences, completion_executor):
             - 학문적 기여: 이론적 확장성 또는 새로운 연구 패러다임 제시
             - 실용적 가치: 실제 적용 사례 및 산업계 파급효과
             - 비교 분석: 기존 연구 대비 우월성 (정량적 지표 제시)
-            - 중요 태그: 논문을 기반으로한 중요키워드로 태그를 생성
+            - 중요 태그: 논문을 기반으로한 중요 키워드로 태그를 반드시 영어로 생성
 
             [작성 원칙]
             - 다층적 구조: 메타 인지적 관점에서 개념 > 방법 > 결과 > 영향력 계층화
@@ -87,7 +87,7 @@ def abstractive_summarization(extracted_sentences, completion_executor):
 
             비교 분석에서는 PPO(Proximal Policy Optimization), SAC(Soft Actor-Critic), TD3(Twin Delayed DDPG) 등 5가지 최신 강화학습 알고리즘과의 엄격한 비교 실험을 진행했습니다. 복잡한 작업 환경에서의 평균 보상(Reward)이 기존 대비 **18.7% 증가**했으며(그림 8), 학습 시간 또한 **30% 단축**되었습니다(표 7). 이러한 결과는 제안 모델이 효율성과 성능 면에서 우수함을 입증합니다.
             
-            중요 태그: #Deep Reinforcement Learning, #Robot Control, #Hierarchical Reinforcement Learning, #Meta-Reinforcement Learning, #Multi-Timescale Learning
+            Keywords: #Deep Reinforcement Learning, #Robot Control, #Hierarchical Reinforcement Learning, #Meta-Reinforcement Learning, #Multi-Timescale Learning
             """
         },
         {"role": "user", "content": extracted_sentences}
