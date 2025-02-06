@@ -12,6 +12,7 @@ __pycache__/
 *.jpg
 *.png
 *.txt
+*.json
 
 # 강제입력
 !requirements.txt
