@@ -4,12 +4,13 @@ import torch
 from typing import Dict, Any, Optional
 from collections import defaultdict
 from functools import lru_cache
+from base64 import b64encode
 from hashlib import sha256
 
 from pydantic import BaseModel
 from fastapi import FastAPI, UploadFile, status, Depends, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from config.config import AI_CONFIG, API_CONFIG
 from pdf2text import Pdf2Text, pdf_to_image
@@ -23,7 +24,11 @@ from datebase.connection import DatabaseConnection
 from datebase.operations import PaperManager, DocumentUploader, ChatHistoryManager, AdditionalFileUploader
 
 from sentence_transformers import SentenceTransformer, CrossEncoder
+from summarizer import Summarizer
 
+import torch
+import gc
+import os
 
 @lru_cache()
 def get_db_connection():
@@ -47,7 +52,6 @@ def get_document_manager(conn=Depends(get_db_connection)):
 def get_add_file_uploader(conn=Depends(get_db_connection)):
     return AdditionalFileUploader(conn)
 
-
 embedding_api = EmbeddingAPI(
     host=API_CONFIG['host2'],
     api_key=API_CONFIG['api_key'],
@@ -68,6 +72,9 @@ multi_chat_manager = MultiChatManager()
 chat_history_manager = ChatHistoryManager(
     get_db_connection(), embedding_api, completion_executor
 )
+
+def get_chat_manager(conn=Depends(get_db_connection)):
+    return ChatHistoryManager(conn, embedding_api, completion_executor)
 
 app = FastAPI()
 
@@ -121,7 +128,7 @@ async def upload_pdf(file: UploadFile,
         print(f"Request data: {req}")
 
         if not file.filename.endswith('.pdf'):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                                 detail="PDF 파일만 업로드 가능합니다.")
 
         # Byte로 변경
@@ -280,6 +287,7 @@ async def pdf2text_table_figure(req: PdfRequest,
                             detail=f"PDF with ID {pdf_id} not found or not uploaded yet")
 
     p2t = Pdf2Text(AI_CONFIG['layout_model_path'])
+    model = SentenceTransformer("dragonkue/bge-m3-ko")
     pdf_images, lang = pdf_to_image(pdf_path)
 
     if os.path.exists(pdf_path):
@@ -298,18 +306,22 @@ async def pdf2text_table_figure(req: PdfRequest,
     del p2t
     torch.cuda.empty_cache()
 
+    # match_res = {'figure': [{}, {}, {}], 'table': [{}, {}, {}]}
     # TODO 매칭된 Table은 Vector DB에 저장하는 코드
-    table_flag = file_manager.store_figures_and_tables(
-        match_res, user_id, req.pdf_id)
-
     # TODO 매칭된 Figure은 정제하여 DeepSeek으로 전달하는 코드
-
     # TODO DeepSeek 결과물 Vector DB 저장 후
-    # figure_flag =
+    table_flag = file_manager.store_figures_and_tables(
+        total_match_res, user_id, req.pdf_id, 
+        model, completion_executor)
+    
+    del model
+    torch.cuda.empty_cache()
+    gc.collect()
 
     # TODO 두 작업 모두 종료되면 response 반환
-
-    return {"success": True, "message": "여기까지면 정상적으로 온거야 ㅇㅈ? 저장된거 확인해보셈"}
+    if table_flag:
+        return {"success": True, "message": "여기까지면 정상적으로 온거야 ㅇㅈ? 저장된거 확인해보셈"}
+    return {"success": False, "message": "Embedding 값 저장 중 오류 발생"}
 
 # 요약 및 오디오, 태그, 타임라인 파일 생성하기
 
@@ -318,11 +330,23 @@ async def pdf2text_table_figure(req: PdfRequest,
 async def summarize_and_get_files(req: PdfRequest,
                                   file_manager: FileManager = Depends(get_file_manager)):
     pdf_id, user_id = req.pdf_id, req.user_id
-    summarizer = PaperSummarizer()
+    model = Summarizer()
 
-    paper_file = file_manager.get_paper(user_id, pdf_id)
+    paper_file = file_manager.get_paper(pdf_id, user_id)
 
-    final_summary = summarizer.generate_summary(paper_file)
+    results = pdf2text_recognize(paper_file, key="summary")
+
+    label_summaries = []
+    for result in results:
+        summary = model(result, num_sentences=10)
+        label_summaries.append(summary)
+
+    combined_summary = " ".join(label_summaries)
+    final_summary = model(combined_summary, num_sentences=30)
+
+    del model
+    torch.cuda.empty_cache()
+    gc.collect()
 
     file_manager.extract_summary_content(
         final_summary=final_summary,
@@ -345,6 +369,14 @@ async def get_paper(req: PdfRequest,
         return FileResponse(pdf_path, media_type="application/pdf")
     return {'success': False, "message": "Paper not found"}
 
+@app.get("/pdf/get_translate_paper")
+async def get_translate_paper(req: PdfRequest,
+                              file_manager: FileManager = Depends(get_file_manager)):
+    pdf_path = file_manager.get_trans_paper(req.user_id, req.pdf_id)
+
+    if pdf_path:
+        return FileResponse(pdf_path, media_type="application/pdf")
+    return {'success': False, "message": "Paper not found"}
 
 @app.get("/pdf/get_figure")
 async def get_figure(req: PdfRequest,
@@ -353,7 +385,21 @@ async def get_figure(req: PdfRequest,
     fig_paths = file_manager.get_figure(user_id, pdf_id)
 
     if fig_paths:
-        return {"status": "success", "figures": fig_paths}
+        figures_data = []
+        for fig in fig_paths:
+            with open(fig['path'], 'rb') as img_file:
+                img_data = b64encode(img_file.read()).decode('utf-8')
+                figures_data.append({
+                    'image': img_data,
+                    'figure_number': fig['figure_number'],
+                    'caption': fig['caption']
+                })
+            os.remove(fig['path'])
+
+        return JSONResponse({
+            "status": "success",
+            "figures": figures_data
+        })
     return {'success': False, "message": "Figures not found"}
 
 
@@ -415,8 +461,16 @@ async def get_table(req: PdfRequest,
 # TODO 프론트 메인 화면에서 시작하기를 눌렀을 때 user_id의 history에서 pdf title을 전송해주는 API
 
 # TODO history에서 해당 pdf를 눌렀을 때 pdf와 번역본, chat history를 전송해주는 API
+@app.get("/pdf/get_chat_hist")
+async def get_chat_hist(req: PdfRequest,
+                        chat_history_manager: ChatHistoryManager = Depends(get_chat_manager)):
+    chat_hist = chat_history_manager.get_chat_history(req.user_id, req.pdf_id)
 
-def pdf2text_recognize(pdf):
+    if chat_hist:
+        return {"success": True, "chat_hist": chat_hist}
+    return {"success": False, "message": "채팅 기록 불러오기 중 에러 발생"}
+
+def pdf2text_recognize(pdf, key="text"):
     p2t = Pdf2Text(AI_CONFIG['layout_model_path'])
 
     pdf_images, lang = pdf_to_image(pdf)
@@ -425,7 +479,11 @@ def pdf2text_recognize(pdf):
 
     del p2t
     torch.cuda.empty_cache()
+    gc.collect()
 
+    if key=="summary":
+        return result
+    
     sentences = [split_sentences(raw_text) for raw_text in result]
 
     for idx in range(1, len(sentences)):

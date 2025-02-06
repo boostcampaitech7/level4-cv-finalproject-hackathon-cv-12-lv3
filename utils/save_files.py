@@ -4,16 +4,19 @@ from typing import Dict
 from dotenv import load_dotenv
 # from .model_manager import model_manager
 from .summary_short import abstractive_summarization
-from .timeline import timeline, extract_keywords
+from .timeline import extract_keywords, timeline_str, abstractive_timeline
 from .script import write_full_script
 from .audiobook_test import script_to_speech
+from .vlm import conversation_with_images, translate_clova
 import os
 import json
 import random
 import tempfile
+from PIL import Image
 
 load_dotenv()
 
+# TODO 이거 임시 파일 만들고 삭제하는 로직은 나중에 추가하기
 # save_files.py
 
 
@@ -81,58 +84,75 @@ class FileManager:
             tran_pdf_file_path=storage_info['path']
         )
 
-    def store_figures_and_tables(self, match_res, user_id, paper_id):
+    def store_figures_and_tables(self, match_res, user_id, paper_id,
+                                 model, completion_executor):
         """Figure랑 Table 저장 후 Vector DB 저장까지"""
         try:
-            # model = model_manager.sentence_transformer
             chunked_documents = []
-            for match_res in match_res:  # 리스트를 순회
-                if 'figure' in match_res:
-                    for figure in match_res['figure']:
-                        temp_path = f"temp_figure_{paper_id}_{figure['caption_number']}.png"
-                        figure['obj'].save(temp_path)
+            # figure 처리
+            if 'figure' in match_res:
+                for figure in match_res['figure']:
+                    temp_path = f"temp_figure_{paper_id}_{figure['caption_number']}.png"
+                    figure['obj'].save(temp_path)
 
-                        storage_info = self.storage_manager.upload_figure(
-                            file_path=temp_path,
-                            bucket_name=os.getenv('NCP_BUCKET_NAME')
-                        )
+                    storage_info = self.storage_manager.upload_figure(
+                        file_path=temp_path,
+                        bucket_name=os.getenv('NCP_BUCKET_NAME')
+                    )
 
-                        self.additional_manager.insert_figure_file(
-                            user_id=user_id,
-                            paper_id=paper_id,
-                            storage_path=storage_info['path'],
-                            caption_number=figure['caption_number'],
-                            description=figure['caption_text']
-                        )
+                    self.additional_manager.insert_figure_file(
+                        user_id=user_id,
+                        paper_id=paper_id,
+                        storage_path=storage_info['path'],
+                        caption_number=figure['caption_number'],
+                        description=figure['caption_text']
+                    )
 
-                        # [ ] 해당 figure를 deepseek로 보내고, deepseek에서 반환받은 값을 vector로 저장하는 로직
+                    # DeepSeek 처리
+                    image = Image.open(temp_path)
+                    caption = "This is Transformer Acheitecture img"
+                    response = conversation_with_images("deepseek-ai/deepseek-vl-7b-chat", 
+                                                    [image], 
+                                                    image_description=figure['caption_text'] 
+                                                    if figure['caption_text'] else caption)
+                    trans_response = translate_clova(response, completion_executor)
 
-                        os.remove(temp_path)
+                    # embedding
+                    table_doc = {
+                        "page": figure['caption_number'],
+                        "chunk": trans_response,
+                        "type": "table"
+                    }
+                    if table_doc["chunk"] and isinstance(table_doc["chunk"], str):
+                        table_doc["embedding"] = model.encode(table_doc["chunk"]).tolist()
+                    chunked_documents.append(table_doc)
+                    os.remove(temp_path)
 
-                if 'table' in match_res:
-                    for table in match_res['table']:
-                        self.additional_manager.insert_table_file(
-                            user_id=user_id,
-                            paper_id=paper_id,
-                            table_obj=table['obj'],
-                            caption_number=table['caption_number'],
-                            description=table['caption_text']
-                        )
+            # table 처리
+            if 'table' in match_res:
+                for table in match_res['table']:
+                    self.additional_manager.insert_table_file(
+                        user_id=user_id,
+                        paper_id=paper_id,
+                        table_obj=table['obj'],
+                        caption_number=table['caption_number'],
+                        description=table['caption_text']
+                    )
 
-                        # [o] 해당 table을 vector로 저장하는 로직 필요
-                        table_doc = {
-                            "page": table['caption_number'],
-                            "chunk": table['caption_text'],
-                            "type": "table"
-                        }
-                        # table_doc["embedding"] = model.encode(table_doc["chunk"]).tolist()
-                        chunked_documents.append(table_doc)
+                    table_doc = {
+                        "page": table['caption_number'],
+                        "chunk": table['caption_text'],
+                        "type": "table"
+                    }
+                    if table_doc["chunk"] and isinstance(table_doc["chunk"], str):
+                        table_doc["embedding"] = model.encode(table_doc["chunk"]).tolist()
+                    chunked_documents.append(table_doc)
 
-                if chunked_documents:
-                    self.document_manager.upload_documents(
-                        chunked_documents, user_id, paper_id)
-
-            return True
+            if chunked_documents:
+                self.document_manager.upload_documents(chunked_documents, user_id, paper_id)
+                return True
+                
+            return False
         except Exception as e:
             print(f"Figure/Table 저장 중 에러 발생: {str(e)}")
             return False
@@ -164,7 +184,8 @@ class FileManager:
                 )
 
             # 3. 타임라인 저장
-            timeline_data = timeline(query_list)
+            timeline_data = timeline_str(query_list)
+            timeline_data = abstractive_timeline(timeline_data)
             temp_timeline_path = f"temp_timeline_{paper_id}.json"
             with open(temp_timeline_path, 'w', encoding='utf-8') as f:
                 json.dump(timeline_data, f, ensure_ascii=False, indent=4)
@@ -240,18 +261,43 @@ class FileManager:
                 raise Exception("Paper not found")
 
             temp_path = f"temp_paper_{paper_id}.pdf"
-            downloaded = self.storage_manager.download_file(
-                file_url=paper_info['pdf_file_path'],
-                local_path=temp_path,
-                bucket_name=os.getenv('NCP_BUCKET_NAME')
-            )
+            if not os.path.exists(temp_path):
+                downloaded = self.storage_manager.download_file(
+                    file_url=paper_info['pdf_file_path'],
+                    local_path=temp_path,
+                    bucket_name=os.getenv('NCP_BUCKET_NAME')
+                )
 
-            if not downloaded:
-                raise Exception("Figure 다운로드 실패")
-
+                if not downloaded:
+                    raise Exception("Paper 다운로드 실패")
+            
             return temp_path
         except Exception as e:
-            print(f"Figure 가져오기 실패: {str(e)}")
+            print(f"Paper 가져오기 실패: {str(e)}")
+            return None
+        
+    def get_trans_paper(self, user_id: str, paper_id: int) -> str:
+        """Storage에서 PDF 파일 가져오는 메서드"""
+        try:
+            paper_info = self.paper_manager.get_paper_info(user_id, paper_id)
+
+            if not paper_info:
+                raise Exception("Trans Paper not found")
+            
+            temp_path = f"temp_trans_paper_{paper_id}.pdf"
+            if not os.path.exists(temp_path):
+                downloaded = self.storage_manager.download_file(
+                    file_url=paper_info['tran_pdf_file_path'],
+                    local_path=temp_path,
+                    bucket_name=os.getenv('NCP_BUCKET_NAME')
+                )
+
+                if not downloaded:
+                    raise Exception("Trans Paper 다운로드 실패")
+            
+            return temp_path
+        except Exception as e:
+            print(f"Trans Paper 가져오기 실패: {str(e)}")
             return None
 
     def get_figure(self, user_id: str, paper_id: str):

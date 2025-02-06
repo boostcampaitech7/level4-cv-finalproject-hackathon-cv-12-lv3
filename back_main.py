@@ -139,7 +139,8 @@ if __name__ == '__main__':
         file_manager.update_translated_paper(mono_pdf_path, user_id, paper_id)
 
         # [o] TODO 3. Figure & Table 저장 (Figure & table 추출 들어가있는지)
-        file_manager.store_figures_and_tables(all_match_res, user_id, paper_id)
+        file_manager.store_figures_and_tables(all_match_res, user_id, paper_id,
+                                              model, completion_executor)
 
         # [o] TODO 4. 요약 추출 및 저장 (요약은 summary로 하는 거 같은데 txt로 반환이 안되는 거 같음)
         # [o] TODO 5. 요약을 통한 오디오 파일 생성 및 저장 (요약이 되는대로 함수만 엮으면 될듯)
