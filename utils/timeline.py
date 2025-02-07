@@ -3,8 +3,10 @@ import time
 import json
 import re
 import os
-import google.generativeai as genai
 from mtranslate import translate
+from api.api_classes import ChatCompletionsExecutor
+from config.config import API_CONFIG
+import json
 
 
 def translate_to_english(korean_text):
@@ -13,6 +15,8 @@ def translate_to_english(korean_text):
     """
     try:
         translated = translate(korean_text, "en", "ko")  # 한국어 -> 영어 번역
+        if not translated.strip():  # 빈 문자열 방지
+            raise ValueError("번역 결과가 빈 문자열입니다.")
         return translated
     except Exception as e:
         print(f"⚠️ 번역 실패: {korean_text} → 원래 단어 유지 ({e})")
@@ -69,26 +73,29 @@ def timeline_str(query_list):
     return output_str
 
 
-# API 키 설정
-api_key = os.getenv("GEMINI_API_KEY")
-# ✅ Gemini API 설정
-genai.configure(api_key=api_key)
 
 
 def abstractive_timeline(user_input):
     """
-    Gemini API를 사용하여 논문 추천을 수행하는 함수.
     - 입력된 키워드 4개에 대해 각각 3개의 논문을 추천
     - 논문 제목, 저자, 출판 연도, 논문 요약, 난이도, 추천 이유 포함
     - JSON 형식으로 반환
     """
+    chat_api = ChatCompletionsExecutor(
+        host=API_CONFIG["host"],
+        api_key=API_CONFIG["api_key"],
+        request_id=API_CONFIG["request_id"],
+    )
 
     system_prompt = """
-            당신은 인공지능 및 머신러닝 논문 추천 시스템입니다.
-            사용자로부터 특정 검색 키워드 4개에 대한 논문 목록 3개를 입력받습니다. 
+            당신은 인공지능 및 머신러닝 논문 추천이자 시스템입니다.
+            반드시 아래에 있는 준수하여 출력해주세요.
+            그외의 출력은 잘못된 출력으로 처리합니다.
+            사용자로부터 특정 검색 키워드 4개를 입력받습니다. 
             이 데이터를 참고하여, 검색 키워드 4개에 대해서 키워드별로 읽으면 좋은 논문을 각각 3개 찾아서 출력하세요.
+            단, 너무 오래된 논문이나 너무 최신의 논문은 추천하지 않습니다.
             **반드시 4개의 키워드 각각에 대해 3개의 논문을 추천해야 합니다.**
-            **429 오류가 발생하거나 논문이 없을 경우에도 키워드로 관련 논문 검색을 통해 논문을 찾아내야 하며, 그 키워드로 나오는 논문이 없다면, 관련 키워드(임의로)를 사용해 논문을 검색하여 채워야 합니다.** 
+            
             
             # 🎯 **요구사항**
             - **키워드 4개를 모두 처리할 때까지 반복 수행하세요.**
@@ -98,72 +105,117 @@ def abstractive_timeline(user_input):
             - 논문이 중요한 이유 또는 읽어야 하는 이유를 간단히 설명하세요.
             - **논문의 난이도**(초급, 중급, 고급)를 분류하여 추천하세요.
             
-            🎯 **429에러나 키워드에 관련된 논문이 없을 때 **
-            - 논문 검색 API에서 **429 에러가 발생해서 논문 예시가 없어도 검색을 포기하지 마세요!**
-            - **그런 경우에는, 반드시 키워드 자체를 이용해 관련 논문을 찾아야 합니다.**
-            - 만약 해당 키워드의 논문이 부족하다면, **유사한 개념의 키워드**를 자동 생성하여 논문을 찾아주세요.
-            - 논문 검색 결과가 적더라도 **4개 키워드 × 3개 논문**을 채워야 합니다.
-                        
-            
-            #  **출력 조건
+            #  **출력 형식 (JSON 규칙 준수)**
             - 반드시 준수할 것, 하지만 이는 예시일 뿐 출력 형식을 준수할 것
-            - 불필요한 빈 키워드(`"키워드1": []`)를 절대 포함하지 마세요.
+            - 키워드 4개가 들어가야 하며 각각 3개의 논문을 반드시 추천해야 합니다.
+            - **올바른 JSON을 반환해야 합니다** (콤마 누락, 중괄호 닫힘 오류 등 금지). 
+            - JSON 데이터가 깨지지 않도록 **잘못된 쉼표(,) 삽입 방지** 및 **올바른 배열 종료(`]`) 유지**. 
+            - JSON 이외의 불필요한 텍스트나 설명, 기호는 절대 포함하지 마세요.
+            - 불필요한 빈 키워드("키워드1": )를 절대 포함하지 마세요.
             - "키워드1", "키워드2" 같은 자리표시(플레이스홀더) 키워드는 출력 예시일 뿐이니 출력에 포함하지 마세요.
-            - 출력에는 { } 가장 바깥에 있는 중괄호 안에 있는 내용만 포함해야 하고, ''' 이나 쓸데없는 말은 일절 포함하지 마세요.
             - id 키는 키워드 안 논문 순서대로 1, 2, 3으로 매겨주세요.(그다음 키워드에서는 4,5,6이 아닌 다시 1,2,3으로 매겨주세요.)
             
             
-              {"3D Gaussian Splatting": [
-#                         {
-#                             "id": 1,
-#                             "논문 제목": "3D Gaussian Splatting for Real-Time Radiance Field Rendering",
-#                             "저자": "정보 없음",
-#                             "출판 연도": "2023",
-#                             "논문 요약": "실시간 레이던스 필드 렌더링을 위한 3D 가우시안 스플래팅 방법을 제안한다.",
-#                             "난이도": "고급 (Advanced)",
-#                             "추천 이유": "실제 환경에서의 사실적인 빛 시뮬레이션을 가능하게 하는 기술이다."
-#                         },
-#                         {
-#                             "id": 2,
-#                             "논문 제목": "Mip-Splatting: Alias-Free 3D Gaussian Splatting",
-#                             "저자": "정보 없음",
-#                             "출판 연도": "2023",
-#                             "논문 요약": "에일리어스 없는 3D 가우시안 스플래팅 기법을 제안한다.",
-#                             "난이도": "초급 (Intermediate)",
-#                             "추천 이유": "이미지 품질을 향상시키는 새로운 알고리즘을 제공한다."
-#                         },
-#                         {
-#                             "id": 3,
-#                             "논문 제목": "A Survey on 3D Gaussian Splatting",
-#                             "저자": "정보 없음",
-#                             "출판 연도": "2024",
-#                             "논문 요약": "3D 가우시안 스플래팅 분야의 다양한 접근법을 조사하고 비교한다.",
-#                             "난이도": "중급 (Advanced)",
-#                             "추천 이유": "해당 주제에 대한 포괄적인 개요를 제공하므로 초보자에게도 유용하다."
-#                         }
-                ],
-                "키워드2": [ ... ],
-                "키워드3": [ ... ],
-                "키워드4": [ ... ]
-            }
+
+                  {
+                    "Social Capital": [
+                        {
+                            "id": 1,
+                            "논문 제목": "Social Capital and Social Networks: A Conceptual and Empirical Overview",
+                            "저자": "Bourdieu, P.",
+                            "출판 연도": 2003,
+                            "논문 요약": "사회 자본과 사회적 네트워크의 개념적, 경험적 개요를 제공합니다.",
+                            "난이도": "중급",
+                            "추천 이유": "사회 자본 연구의 기초적 개요를 제공하는 영향력 있는 논문입니다."
+                        },
+                        {
+                            "id": 2,
+                            "논문 제목": "The Strength of Weak Ties: A Network Theory Revisited",
+                            "저자": "Granovetter, M. S.",
+                            "출판 연도": 1973,
+                            "논문 요약": "약한 유대의 중요성과 사회 자본에서의 역할에 대해 논의합니다.",
+                            "난이도": "초급",
+                            "추천 이유": "네트워크 이론에서 널리 인용되는 논문으로 약한 유대의 개념을 설명합니다."
+                        },
+                        {
+                            "id": 3,
+                            "논문 제목": "Social Capital: Its Origins and Applications in Modern Sociology",
+                            "저자": "Coleman, J. S.",
+                            "출판 연도": 1988,
+                            "논문 요약": "사회 자본의 기원과 현대 사회학에서의 적용에 대해 설명합니다.",
+                            "난이도": "중급",
+                            "추천 이유": "사회 자본 개념을 처음 정의하고 이를 사회 현상에 적용한 획기적인 논문입니다."
+                        }
+                    ],
+                      
+                    "키워드2":  [] ,
+                    "키워드3":  [] ,
+                    "키워드4":  []
+                }
+            
 
             
             # ✅ **출력 검증**
-            - **출력하기 전, 초반에 입력으로 받았던 검색 키워드 4개에 대해 각각 3개의 논문정보가 들어있는지 검토하고, 키워드가 부족한 경우에는 반드시 관련 논문을 찾아서라도 논문 3개를 추천해야하고 출력해주세요.또한 출력 형태를 준수하였는지 검토하고 출력해주세요.**
+            - **출력하기 전, 초반에 입력으로 받았던 검색 키워드 4개에 대해 각각 3개의 논문정보가 들어있는지 검토하고, 빠뜨린 부분이 있다면 꼭 형식에 맞게 채워주고 출력해주세요.
+            - **또한 출력 형태를 준수하였는지 검토하고 출력해야하며 이외의 불필요한 말이 들어가 있는지 검토하고 출력해주세요.**
 
             """
-    full_prompt = f"{system_prompt}\n\n사용자 입력 키워드: {user_input}"
-    # ✅ Gemini API 호출
-    model = genai.GenerativeModel("gemini-pro")  # 🔹 Gemini 모델 지정
-    response = model.generate_content(full_prompt)
-    gemini_json = json.loads(response.text)  # 문자열을 JSON으로 변환
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content":  ", ".join(user_input)},
+    ]
+    request_data = {
+        "messages": messages,
+        "topP": 0.8,
+        "topK": 0,
+        "maxTokens": 4096,
+        "temperature": 0.6,
+        "repeatPenalty": 5.0,
+        "stopBefore": [],
+        "includeAiFilters": True,
+        "seed": 1234,
+        "responseFormat": "json"  # 🚀 JSON 강제 출력 설정
+    }
+    response = chat_api.execute(request_data, stream=False)
+    # full_prompt = f"{system_prompt}\n\n사용자 입력 키워드: {user_input}"
+    # # ✅ Gemini API 호출
+    # model = genai.GenerativeModel(model_name="gemini-pro",
+    # generation_config={"response_mime_type": "application/json"})  # JSON 모드 강제)  # 🔹 Gemini 모델 지정
+    # response = model.generate_content(full_prompt)
+    
+    # JSON 문자열 추출
+    response_text = response["message"]["content"]
+    
+    print(response_text)
 
-    # ✅ JSON 파일로 저장
-    output_file = "papers_gemini2.json"
-    with open(output_file, "w", encoding="utf-8") as json_file:
-        json.dump(gemini_json, json_file, ensure_ascii=False, indent=4)
+    try:
+        # JSON 부분만 추출
+        json_string = extract_json(response_text)
 
-    print(f"📁 JSON 파일 저장 완료: {output_file}")
-    print(json.dumps(gemini_json, ensure_ascii=False, indent=4))  # 결과 출력
+        # JSON 변환
+        parsed_json = json.loads(json_string)
 
-    return gemini_json
+        # 변환된 JSON 저장
+        with open("clova_output.json", "w", encoding="utf-8") as f:
+            json.dump(parsed_json, f, ensure_ascii=False, indent=4)
+
+        print("✅ JSON 파일 저장 완료: clova_output.json")
+
+    except ValueError as e:
+        print(f"❌ JSON 추출 오류 발생: {e}")
+
+    except json.JSONDecodeError as e:
+        print(f"❌ JSON 변환 오류 발생: {e}")
+
+    return parsed_json
+
+def extract_json(response_text):
+    """
+    Clova 응답에서 JSON 데이터만 추출하는 함수.
+    - JSON이 깨질 가능성을 방지하고, 정규식으로 JSON 본문만 추출.
+    """
+    json_match = re.search(r'({.*})', response_text, re.DOTALL)
+    if json_match:
+        return json_match.group(1)  # JSON 문자열만 반환
+    else:
+        raise ValueError("JSON 응답을 감지할 수 없음")
