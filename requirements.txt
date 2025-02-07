@@ -29,5 +29,5 @@ boto3
 mtranslate
 google-generativeai
 attrdict
-senetencepiece
+sentencepiece
 accelerate
