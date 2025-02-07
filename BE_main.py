@@ -13,7 +13,7 @@ from hashlib import sha256
 from pydantic import BaseModel
 from fastapi import FastAPI, UploadFile, status, Depends, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 
 from config.config import AI_CONFIG, API_CONFIG
 from pdf2text import Pdf2Text, pdf_to_image
@@ -482,7 +482,8 @@ async def get_users_hist(req: PdfRequest,
 @app.post("/pdf/get_chat_hist")
 async def get_chat_hist(req: PdfRequest,
                         chat_history_manager: ChatHistoryManager = Depends(get_chat_manager)):
-    chat_hist = chat_history_manager.get_chat_history(req.user_id, req.pdf_id)
+    user_id, pdf_id = req.user_id, req.pdf_id
+    chat_hist = chat_history_manager.get_chat_history(user_id, pdf_id)
 
     if chat_hist:
         return {"success": True, "chat_hist": chat_hist}
@@ -501,6 +502,101 @@ async def get_summary(req: PdfRequest,
             "data": {"long_summary": summary_info['long_summary'] if summary_info else None}
         }
     return {"success": False, "message": "요약 불러오기 중 에러 발생"}
+
+@app.post("/pdf/get_tags")
+async def get_tags(req: PdfRequest,
+                   additional_uploader: AdditionalFileUploader = Depends(get_add_file_uploader)):
+    user_id, pdf_id = req.user_id, req.pdf_id
+    tag_info = additional_uploader.search_tag_text(user_id, pdf_id)
+
+    if tag_info:
+        return {
+            "success": True,
+            "data": {"tag_text": tag_info}
+        }
+    return {"success": False, "message": "태그 정보를 찾을 수 없습니다."}
+
+@app.post("/pdf/get_summary_pdf_id")
+async def get_summary_pdf_id(req: PdfRequest,
+                            paper_manager: PaperManager = Depends(get_paper_manager)):
+    user_id= req.user_id
+    summary_pdf_id = paper_manager.get_summary_pdf_id(user_id)
+
+    if summary_pdf_id:
+        return {
+            "success": True,
+            "data": {"paper_ids": summary_pdf_id}
+        }
+    return {"success": False, "message": "요약된 PDF ID를 찾을 수 없습니다."}
+
+@app.post("/pdf/get_all_summary_info")
+async def get_all_summary_info(req: PdfRequest,
+                               paper_manager: PaperManager = Depends(get_paper_manager),
+                               file_manager: FileManager = Depends(get_file_manager),
+                               additional_uploader: AdditionalFileUploader = Depends(get_add_file_uploader)):
+    user_id, pdf_id = req.user_id, req.pdf_id
+
+    try:
+        # 1. Paper 기본 정보 가져오기
+        paper_info = paper_manager.get_paper_info(user_id, pdf_id)
+        if not paper_info:
+            return {"success": False, "message": "Paper 정보를 찾을 수 없습니다[1]"}
+        
+        # 2. 태그 정보 가져오기
+        tag_info = additional_uploader.search_tag_text(user_id, pdf_id)
+
+        # 3. Figure 정보 가져오기
+        fig_paths = file_manager.get_figure(user_id, pdf_id)
+        figures_data = []
+        if fig_paths:
+            for fig in fig_paths:
+                with open(fig['path'], 'rb') as img_file:
+                    img_data = b64encode(img_file.read()).decode('utf-8')
+                    figures_data.append({
+                        'image': img_data,
+                        'figure_number': fig['figure_number'],
+                        'caption': fig['caption']
+                    })
+                os.remove(fig['path'])
+            
+        # 4. 타임라인 정보 가져오기
+        timeline_path = file_manager.get_timeline(user_id, pdf_id)
+        # 5. Audio 정보 확인
+        audio_path = file_manager.get_audio(user_id, pdf_id)
+
+        files_data = {}
+        if timeline_path:
+            with open(timeline_path, 'rb') as f:
+                files_data['timeline'] = f.read()
+
+        if audio_path:
+            with open(audio_path, 'rb') as f:
+                files_data['audio'] = f.read()
+
+        # 6. Table 정보 가져오기
+        table_info = additional_uploader.search_table_file(user_id, pdf_id)
+
+        json_data = {
+            "paper_info": {
+                "title": paper_info['title'],
+                "long_summary": paper_info['long_summary'],
+                "author": paper_info['author'],
+                "uploaded_at": paper_info['uploaded_at']
+            },
+            "tags": tag_info,
+            "figures": figures_data,
+            "tables": table_info
+        }
+
+        return Response(
+            content=json.dumps({
+                "json_data": json_data,
+                "files": files_data
+            }),
+            media_type="application/json"
+        )
+    except Exception as e:
+        return {"success": False, "message": f"정보 조회 중 오류가 발생했습니다: {str(e)}"}
 
 
 def pdf2text_recognize(pdf, key="text"):

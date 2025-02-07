@@ -189,7 +189,24 @@ class PaperManager(BaseDBHandler):
             }
         else:
             return None
+        
+    def get_summary_pdf_id(self, user_id: str):
+        query = """
+            SELECT DISTINCT
+                a.paper_id
+            FROM papers a
+            JOIN audio_info b
+            ON a.user_id = b.user_id
+            AND a.paper_id = b.paper_id
+            WHERE a.user_id = %s
+            AND a.long_summary is not null
+        """
+        result = self.execute_query(query, (user_id,))
 
+        if result:
+            paper_ids = [row[0] for row in result]
+            return paper_ids
+        return None
 
 class DocumentUploader:
     def __init__(self, connection):
@@ -607,9 +624,13 @@ class AdditionalFileUploader(BaseDBHandler):
             AND paper_id = %s
         """
 
-        tags = self.execute_query_one(query, (user_id, paper_id))
+        result = self.execute_query(query, (user_id, paper_id))
 
-        return tags
+        if result:
+            tags = [row[0] for row in result]
+            return tags
+
+        return None
 
     def search_timeline_file(self, user_id, paper_id):
         query = """
