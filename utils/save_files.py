@@ -111,11 +111,12 @@ class FileManager:
                     # DeepSeek 처리
                     image = Image.open(temp_path)
                     caption = "This is Transformer Acheitecture img"
-                    response = conversation_with_images("deepseek-ai/deepseek-vl-7b-chat", 
-                                                    [image], 
-                                                    image_description=figure['caption_text'] 
-                                                    if figure['caption_text'] else caption)
-                    trans_response = translate_clova(response, completion_executor)
+                    response = conversation_with_images("deepseek-ai/deepseek-vl-7b-chat",
+                                                        [image],
+                                                        image_description=figure['caption_text']
+                                                        if figure['caption_text'] else caption)
+                    trans_response = translate_clova(
+                        response, completion_executor)
 
                     # embedding
                     table_doc = {
@@ -124,7 +125,8 @@ class FileManager:
                         "type": "table"
                     }
                     if table_doc["chunk"] and isinstance(table_doc["chunk"], str):
-                        table_doc["embedding"] = model.encode(table_doc["chunk"]).tolist()
+                        table_doc["embedding"] = model.encode(
+                            table_doc["chunk"]).tolist()
                     chunked_documents.append(table_doc)
                     os.remove(temp_path)
 
@@ -145,13 +147,15 @@ class FileManager:
                         "type": "table"
                     }
                     if table_doc["chunk"] and isinstance(table_doc["chunk"], str):
-                        table_doc["embedding"] = model.encode(table_doc["chunk"]).tolist()
+                        table_doc["embedding"] = model.encode(
+                            table_doc["chunk"]).tolist()
                     chunked_documents.append(table_doc)
 
             if chunked_documents:
-                self.document_manager.upload_documents(chunked_documents, user_id, paper_id)
+                self.document_manager.upload_documents(
+                    chunked_documents, user_id, paper_id)
                 return True
-                
+
             return False
         except Exception as e:
             print(f"Figure/Table 저장 중 에러 발생: {str(e)}")
@@ -270,12 +274,12 @@ class FileManager:
 
                 if not downloaded:
                     raise Exception("Paper 다운로드 실패")
-            
+
             return temp_path
         except Exception as e:
             print(f"Paper 가져오기 실패: {str(e)}")
             return None
-        
+
     def get_trans_paper(self, user_id: str, paper_id: int) -> str:
         """Storage에서 PDF 파일 가져오는 메서드"""
         try:
@@ -283,7 +287,7 @@ class FileManager:
 
             if not paper_info:
                 raise Exception("Trans Paper not found")
-            
+
             temp_path = f"temp_trans_paper_{paper_id}.pdf"
             if not os.path.exists(temp_path):
                 downloaded = self.storage_manager.download_file(
@@ -294,7 +298,7 @@ class FileManager:
 
                 if not downloaded:
                     raise Exception("Trans Paper 다운로드 실패")
-            
+
             return temp_path
         except Exception as e:
             print(f"Trans Paper 가져오기 실패: {str(e)}")
@@ -310,7 +314,7 @@ class FileManager:
 
             figure_paths = []
             for figure in figure_info:
-                temp_path = f"temp_figure_{paper_id}_{figure['figure_number']}.png"
+                temp_path = f"temp_figure_{paper_id}_{figure['caption_number']}.png"
                 downloaded = self.storage_manager.download_file(
                     file_url=figure['storage_path'],
                     local_path=temp_path,
@@ -318,12 +322,12 @@ class FileManager:
                 )
 
                 if not downloaded:
-                    print(f"Figure {figure['figure_number']} 다운로드 실패")
+                    print(f"Figure {figure['caption_number']} 다운로드 실패")
                     continue
 
                 figure_paths.append({
                     'path': temp_path,
-                    'figure_number': figure['figure_number'],
+                    'figure_number': figure['caption_number'],
                     'caption': figure.get('description', '')
                 })
 
@@ -432,7 +436,7 @@ class FileManager:
 
             if figure_info and len(figure_info) > 0:
                 selected_figure = random.choice(figure_info)
-                temp_thumbnail_path = f"temp_thumbnail_{paper_id}_{figure_info['figure_number']}.png"
+                temp_thumbnail_path = f"temp_thumbnail_{paper_id}_{selected_figure['caption_number']}.png"
 
                 if self.storage_manager.download_file(
                     file_url=selected_figure['storage_path'],

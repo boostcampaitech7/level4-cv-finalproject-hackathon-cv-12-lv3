@@ -6,6 +6,7 @@ import os
 import google.generativeai as genai
 from mtranslate import translate
 
+
 def translate_to_english(korean_text):
     """
     한글 키워드를 영어로 번역하는 함수 (API 없이 작동).
@@ -16,6 +17,7 @@ def translate_to_english(korean_text):
     except Exception as e:
         print(f"⚠️ 번역 실패: {korean_text} → 원래 단어 유지 ({e})")
         return korean_text  # 번역 실패 시 원래 단어 유지
+
 
 def extract_keywords(text):
     """
@@ -32,8 +34,9 @@ def extract_keywords(text):
     ]
     return translated_keywords
 
+
 def timeline_str(query_list):
-    # API 엔드포인트 
+    # API 엔드포인트
     base_url = "https://api.semanticscholar.org/graph/v1/paper/search"
 
     output_str = ""
@@ -42,13 +45,14 @@ def timeline_str(query_list):
     for query in query_list:
         output_str += f"\n검색 키워드: {query}\n"
         url = f"{base_url}?query={query}&fields=title,year,citationCount&limit=10"
-        
+
         response = requests.get(url)
 
         if response.status_code == 200:
             data = response.json()
-            
-            sorted_papers = sorted(data.get("data", []), key=lambda x: x["citationCount"], reverse=True)[:3]
+
+            sorted_papers = sorted(
+                data.get("data", []), key=lambda x: x["citationCount"], reverse=True)[:3]
 
             for paper in sorted_papers:
                 short_title = paper["title"]
@@ -61,13 +65,15 @@ def timeline_str(query_list):
 
         # 속도 제한을 고려하여 1초 대기
         time.sleep(1)
-        
+
     return output_str
+
 
 # API 키 설정
 api_key = os.getenv("GEMINI_API_KEY")
 # ✅ Gemini API 설정
 genai.configure(api_key=api_key)
+
 
 def abstractive_timeline(user_input):
     """
@@ -76,8 +82,8 @@ def abstractive_timeline(user_input):
     - 논문 제목, 저자, 출판 연도, 논문 요약, 난이도, 추천 이유 포함
     - JSON 형식으로 반환
     """
-    
-    system_prompt="""
+
+    system_prompt = """
             당신은 인공지능 및 머신러닝 논문 추천 시스템입니다.
             사용자로부터 특정 검색 키워드 4개에 대한 논문 목록 3개를 입력받습니다. 
             이 데이터를 참고하여, 검색 키워드 4개에 대해서 키워드별로 읽으면 좋은 논문을 각각 3개 찾아서 출력하세요.
@@ -110,7 +116,7 @@ def abstractive_timeline(user_input):
               {"3D Gaussian Splatting": [
 #                         {
 #                             "id": 1,
-                              "논문 제목": "3D Gaussian Splatting for Real-Time Radiance Field Rendering",
+#                             "논문 제목": "3D Gaussian Splatting for Real-Time Radiance Field Rendering",
 #                             "저자": "정보 없음",
 #                             "출판 연도": "2023",
 #                             "논문 요약": "실시간 레이던스 필드 렌더링을 위한 3D 가우시안 스플래팅 방법을 제안한다.",
@@ -118,7 +124,7 @@ def abstractive_timeline(user_input):
 #                             "추천 이유": "실제 환경에서의 사실적인 빛 시뮬레이션을 가능하게 하는 기술이다."
 #                         },
 #                         {
-    #                         "id": 2,
+#                             "id": 2,
 #                             "논문 제목": "Mip-Splatting: Alias-Free 3D Gaussian Splatting",
 #                             "저자": "정보 없음",
 #                             "출판 연도": "2023",
@@ -127,7 +133,7 @@ def abstractive_timeline(user_input):
 #                             "추천 이유": "이미지 품질을 향상시키는 새로운 알고리즘을 제공한다."
 #                         },
 #                         {
- #                            "id": 3,
+#                             "id": 3,
 #                             "논문 제목": "A Survey on 3D Gaussian Splatting",
 #                             "저자": "정보 없음",
 #                             "출판 연도": "2024",
@@ -152,7 +158,7 @@ def abstractive_timeline(user_input):
     response = model.generate_content(full_prompt)
     gemini_json = json.loads(response.text)  # 문자열을 JSON으로 변환
 
-        # ✅ JSON 파일로 저장
+    # ✅ JSON 파일로 저장
     output_file = "papers_gemini2.json"
     with open(output_file, "w", encoding="utf-8") as json_file:
         json.dump(gemini_json, json_file, ensure_ascii=False, indent=4)

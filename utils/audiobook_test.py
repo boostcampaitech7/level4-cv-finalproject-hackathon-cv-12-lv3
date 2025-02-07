@@ -1,3 +1,12 @@
+from google.cloud import texttospeech
+import base64
+from http import HTTPStatus  # For better HTTP status code handling
+from pydub import AudioSegment  # Import pydub for audio manipulation
+from tqdm import tqdm
+from utils.script import write_full_script
+import requests
+import io
+from config.config import VOICE_CONFIG
 import urllib.request
 import urllib.parse
 
@@ -5,23 +14,14 @@ import sys
 import os
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(current_dir, ".."))
-from config.config import VOICE_CONFIG
-
-import io
-import requests
-from utils.script import write_full_script
-from tqdm import tqdm
-from pydub import AudioSegment  # Import pydub for audio manipulation
-from http import HTTPStatus  # For better HTTP status code handling
-import base64
-from google.cloud import texttospeech
 
 
 # Google Cloud TTS API 키 가져오기
 GCP_API_KEY = os.getenv("GCP_API_KEY")
 
 # 서비스 계정 키 환경 변수 설정
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/data/ephemeral/home/jm/level4-cv-finalproject-hackathon-cv-12-lv3/famous-sandbox-444912-s5-293b5f9718ab.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "your_json_path"
+
 
 def synthesize_text(text, voice_type="speaker1"):
     """Google Cloud TTS를 사용하여 텍스트를 음성으로 변환하는 함수"""
@@ -49,6 +49,7 @@ def synthesize_text(text, voice_type="speaker1"):
 
     return response.audio_content
 
+
 def script_to_speech(conversations):
     final_audio = AudioSegment.empty()
 
@@ -57,18 +58,24 @@ def script_to_speech(conversations):
         haha_text = conversation.get("하하", "")
 
         if jaeseok_text:
-            audio_content = synthesize_text(jaeseok_text, voice_type="speaker1")
-            jaeseok_audio = AudioSegment.from_file(io.BytesIO(audio_content), format="mp3")
-            final_audio += jaeseok_audio.fade_in(duration=100).fade_out(duration=100)
+            audio_content = synthesize_text(
+                jaeseok_text, voice_type="speaker1")
+            jaeseok_audio = AudioSegment.from_file(
+                io.BytesIO(audio_content), format="mp3")
+            final_audio += jaeseok_audio.fade_in(
+                duration=100).fade_out(duration=100)
 
         if haha_text:
             pause = AudioSegment.silent(duration=200)
             final_audio += pause
             audio_content = synthesize_text(haha_text, voice_type="speaker2")
-            haha_audio = AudioSegment.from_file(io.BytesIO(audio_content), format="mp3")
-            final_audio += haha_audio.fade_in(duration=100).fade_out(duration=100)
+            haha_audio = AudioSegment.from_file(
+                io.BytesIO(audio_content), format="mp3")
+            final_audio += haha_audio.fade_in(
+                duration=100).fade_out(duration=100)
 
     return final_audio
+
 
 if __name__ == "__main__":
     try:
