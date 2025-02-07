@@ -154,9 +154,7 @@ class FileManager:
             if chunked_documents:
                 self.document_manager.upload_documents(
                     chunked_documents, user_id, paper_id)
-                return True
-
-            return False
+            return True
         except Exception as e:
             print(f"Figure/Table 저장 중 에러 발생: {str(e)}")
             return False
