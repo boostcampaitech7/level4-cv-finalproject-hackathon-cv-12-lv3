@@ -27,7 +27,7 @@ custom_model = AutoModel.from_pretrained('allenai/scibert_scivocab_uncased', con
 model = Summarizer(custom_model=custom_model, custom_tokenizer=custom_tokenizer)
 
 # PDF 파일 경로 설정
-pdf_filepath = '/data/ephemeral/home/lexxsh/level4-cv-finalproject-hackathon-cv-12-lv3/eval/dataset_paper/bio/PET 분해효소 과발현 전 세포 촉매.pdf'
+pdf_filepath = '/data/ephemeral/home/lexxsh/level4-cv-finalproject-hackathon-cv-12-lv3/eval/dataset_paper/social/SOCIAL CAPITAL Its Origins and.pdf'
 
 # PyPDFLoader를 사용하여 PDF 파일 로드
 loader = PyPDFLoader(pdf_filepath)
@@ -93,11 +93,10 @@ query_list = extract_keywords(result)
 print(f"태그 : {query_list}")
 
 ## 키워드 검색, JSON 파일 저장
-str= timeline_str(query_list)
-print(f"str : {str}")
+# str= timeline_str(query_list)
+# print(f"str : {str}")
 
 final_result = f"키워드 : {query_list}\n" + str
 
-gemini_json = abstractive_timeline(str)
-print(f"result : {gemini_json}")
+response = abstractive_timeline(query_list)
 
