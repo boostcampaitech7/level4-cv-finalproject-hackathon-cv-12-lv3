@@ -123,7 +123,8 @@ def test():
 @app.post("/pdf", response_model=BaseResponse, response_model_exclude_unset=True)
 async def upload_pdf(file: UploadFile,
                      req: PdfRequest = Depends(PdfRequest.as_form),
-                     file_manager: FileManager = Depends(get_file_manager)):
+                     file_manager: FileManager = Depends(get_file_manager),
+                     chat_manager: ChatHistoryManager = Depends(get_chat_manager)):
     pdf_id, user_id = req.pdf_id, req.user_id
     try:
         print("=== Debug Info ===")
@@ -151,6 +152,11 @@ async def upload_pdf(file: UploadFile,
 
         paper_id = file_manager.store_paper(
             file_content, paper_info, user_id)
+        
+        # 임시 대화 1개 생성
+        chat_manager.store_chat(user_id, paper_id, 'assistant',
+                                "안녕하세요 당신의 논문 공부를 도와드릴 SummarAI입니다! 무엇을 도와드릴까요?",
+                                None, False, None, None, None, None)
 
         return {"success": True, "message": "PDF uploaded successfully", "data": {"filename": paper_info['title'], "file_id": paper_id}}
     except Exception as e:
@@ -314,10 +320,6 @@ async def pdf2text_table_figure(req: PdfRequest,
     del p2t
     torch.cuda.empty_cache()
 
-    # match_res = {'figure': [{}, {}, {}], 'table': [{}, {}, {}]}
-    # TODO 매칭된 Table은 Vector DB에 저장하는 코드
-    # TODO 매칭된 Figure은 정제하여 DeepSeek으로 전달하는 코드
-    # TODO DeepSeek 결과물 Vector DB 저장 후
     table_flag = file_manager.store_figures_and_tables(
         total_match_res, user_id, req.pdf_id,
         model, completion_executor)
@@ -326,14 +328,11 @@ async def pdf2text_table_figure(req: PdfRequest,
     torch.cuda.empty_cache()
     gc.collect()
 
-    # TODO 두 작업 모두 종료되면 response 반환
     if table_flag:
         return {"success": True, "message": "Table과 Figure에 대한 처리가 완료되었습니다. 이제 해당 부분에 대한 답변도 가능합니다~!"}
     return {"success": False, "message": "Embedding 값 저장 중 오류 발생"}
 
 # 요약 및 오디오, 태그, 타임라인 파일 생성하기
-
-
 @app.post("/pdf/summarize", response_model=BaseResponse, response_model_exclude_unset=True)
 async def summarize_and_get_files(req: PdfRequest,
                                   file_manager: FileManager = Depends(get_file_manager)):
@@ -356,14 +355,16 @@ async def summarize_and_get_files(req: PdfRequest,
     torch.cuda.empty_cache()
     gc.collect()
 
-    file_manager.extract_summary_content(
+    file_flag = file_manager.extract_summary_content(
         final_summary=final_summary,
         completion_executor=completion_executor,
         user_id=user_id,
         paper_id=pdf_id
     )
 
-    return {"success": True, "message": "이야 이거 파일 개잘만든다 바로 storage 확인해라 ㅏㅡㅑ"}
+    if file_flag:
+        return {"success": True, "message": "요약 및 오디오, 태그, 타임라인 생성이 완료되었습니다."}
+    return {"success": False, "message": "Summarize 중 에러 발생"}
 
 
 @app.post("/pdf/get_paper")
@@ -385,7 +386,7 @@ async def get_translate_paper(req: PdfRequest,
 
     if pdf_path:
         return FileResponse(pdf_path, media_type="application/pdf")
-    return {'success': False, "message": "Paper not found"}
+    return {'success': False, "message": "Translate Paper not found"}
 
 
 @app.post("/pdf/get_figure")

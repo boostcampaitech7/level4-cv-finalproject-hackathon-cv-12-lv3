@@ -652,3 +652,31 @@ class AdditionalFileUploader(BaseDBHandler):
             return result
         else:
             return None
+
+    def search_users_hist(self, user_id):
+        query = """
+            SELECT DISTINCT
+                b.title,
+                b.paper_id,
+                MAX(a.created_at) as last_chat
+            FROM public.chat_hist a
+            JOIN public.papers b 
+                ON a.user_id = b.user_id
+                AND a.paper_id = b.paper_id
+            WHERE a.user_id = %s
+            GROUP BY b.title, b.paper_id
+            ORDER BY last_chat DESC
+        """
+
+        hist = self.execute_query(query, (user_id,))
+
+        if hist:
+            result = []
+            for row in hist:
+                result.append({
+                    'title': row[0],
+                    'paper_id': row[1],
+                    'last_chat': row[2]
+                })
+            return result
+        return []
