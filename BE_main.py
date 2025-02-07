@@ -468,9 +468,16 @@ async def get_table(req: PdfRequest,
     return {'success': False, "message": "Table information not found"}
 
 
-# TODO 프론트 메인 화면에서 시작하기를 눌렀을 때 user_id의 history에서 pdf title을 전송해주는 API
+@app.post("/pdf/get_users_hist")
+async def get_users_hist(req: PdfRequest,
+                         additional_uploader: AdditionalFileUploader = Depends(get_add_file_uploader)):
+    user_id = req.user_id
+    hist_info = additional_uploader.search_users_hist(user_id)
 
-# TODO history에서 해당 pdf를 눌렀을 때 pdf와 번역본, chat history를 전송해주는 API
+    if hist_info:
+        return {'success': True, "data": hist_info}
+    return {'success': False, 'message': "No chat history found"}
+
 @app.post("/pdf/get_chat_hist")
 async def get_chat_hist(req: PdfRequest,
                         chat_history_manager: ChatHistoryManager = Depends(get_chat_manager)):
@@ -524,7 +531,6 @@ def chunking_embedding(sentences, new_data, size=256):
     chunked_documents = [{"page": idx + 1, "chunk": chunk}
                          for idx, chunks in enumerate(total_chunks) for chunk in chunks]
 
-    # NOTE main.py의 new_data가 어떤 역할인지 잘 몰라 주석처리
     for idx in range(len(sentences)):
         str_i = str(idx)
         if str_i in new_data:
