@@ -178,18 +178,30 @@ class Pdf2Text(object):
                 crop_img = cv2.cvtColor(crop_img, cv2.COLOR_RGB2BGR)
 
                 text_ocr_output = self.text_ocr.Recognize_Text(crop_img, lang)
-
-                caption_outputs.append(
-                    (text_ocr_output, bbox, layout_ele['caption']))
+                caption_outputs.append({
+                    'text': text_ocr_output,
+                    'bbox': bbox,
+                    'type': layout_ele['caption'],
+                    'image': crop_img
+                })
 
             elif ele_type == ElementType.TABLE:
                 new_bbox = expand_bbox_with_original(img, bbox, 10, 10)
                 crop_img = img.crop(new_bbox)
-                table_figure_outputs.append(
-                    (self.table_ocr.ocr(crop_img, lang), new_bbox, "Table"))
+                table_figure_outputs.append({
+                    'obj': self.table_ocr.ocr(crop_img, lang),
+                    'bbox': new_bbox,
+                    'type': "Table",
+                    'image': crop_img
+                })
 
             elif ele_type == ElementType.FIGURE:
-                table_figure_outputs.append((crop_img, bbox, "Figure"))
+                table_figure_outputs.append({
+                    'obj': crop_img,
+                    'bbox': bbox,
+                    'type': "Figure",
+                    'image': None
+                })
             else:  # 나머지 타입은 처리하지않는 유형이므로 무시
                 pass
 
