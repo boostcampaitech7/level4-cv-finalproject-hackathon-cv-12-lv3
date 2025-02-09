@@ -391,6 +391,54 @@ class FileManager:
             print(f"Figure 가져오기 실패: {str(e)}")
             return None
 
+    def get_table(self, user_id: str, paper_id: str):
+        """ Table 가져오기 """
+        try:
+            table_info = self.additional_manager.search_table_file(
+                user_id, paper_id)
+            if not table_info:
+                raise Exception("Table not found")
+
+            table_paths = []
+            for table in table_info:
+                path_dict = {
+                    "table_path": f"temp_table_{paper_id}_{table['caption_number']}.png",
+                    "caption_path": f"temp_caption_{paper_id}_table_{table['caption_number']}.png"
+                }
+
+                table_downloaded = self.storage_manager.download_file(
+                    file_url=table['storage_path'],
+                    local_path=path_dict['table_path'],
+                    bucket_name=os.getenv('NCP_BUCKET_NAME')
+                )
+
+                caption_downloaded = self.storage_manager.download_file(
+                    file_url=table['caption_path'],
+                    local_path=path_dict['caption_path'],
+                    bucket_name=os.getenv('NCP_BUCKET_NAME')
+                )
+
+                if not table_downloaded:
+                    print(f"Table {table['caption_number']} 다운로드 실패")
+                    continue
+
+                if not caption_downloaded:
+                    print(
+                        f"Table {table['caption_number']}번의 Caption 다운로드 실패")
+                    continue
+
+                table_paths.append({
+                    'path': path_dict['table_path'],
+                    'table_number': table['caption_number'],
+                    'caption_info': table.get('caption_info', ''),
+                    'description': table.get('description', ''),
+                    'caption_path': path_dict['caption_path']
+                })
+
+        except Exception as e:
+            print(f"Table 가져오기 실패: {str(e)}")
+            return None
+
     def get_timeline(self, user_id: str, paper_id: str):
         """ Timeline 가져오기 """
         try:

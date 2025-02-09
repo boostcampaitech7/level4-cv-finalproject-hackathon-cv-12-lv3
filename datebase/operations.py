@@ -606,7 +606,8 @@ class AdditionalFileUploader(BaseDBHandler):
     def search_table_file(self, user_id, paper_id):
         query = """
             SELECT 
-                table_obj, caption_number, description
+                table_obj, caption_number, description,
+                storage_path, caption_path
             FROM public.table_info
             WHERE user_id = %s
             AND paper_id = %s
@@ -619,7 +620,9 @@ class AdditionalFileUploader(BaseDBHandler):
             result.append({
                 'table_obj': table[0],
                 'caption_number': table[1],
-                'description': table[2]
+                'description': table[2],
+                'storage_path': table[3],
+                'caption_path': table[4]
             })
 
         return result

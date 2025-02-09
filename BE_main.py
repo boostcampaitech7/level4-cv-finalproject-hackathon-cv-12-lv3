@@ -497,12 +497,42 @@ async def get_script(req: PdfRequest,
 
 @app.post("/pdf/get_table")
 async def get_table(req: PdfRequest,
+                    file_manager: FileManager = Depends(get_file_manager),
                     additional_uploader: AdditionalFileUploader = Depends(get_add_file_uploader)):
     pdf_id, user_id = req.pdf_id, req.user_id
-    table_info = additional_uploader.search_table_file(user_id, pdf_id)
+    table_paths = file_manager.get_table(user_id, pdf_id)
+    # table_info = additional_uploader.search_table_file(user_id, pdf_id)
 
-    if table_info:
-        return {'success': True, "data": {"tables": table_info}}
+    if table_paths:
+        table_data = []
+        for table in table_paths:
+            data = {}
+            with open(table['path'], 'rb') as img_file:
+                img_data = b64encode(img_file.read()).decode('utf-8')
+                data['image'] = img_data
+
+            with open(table['caption_path'], 'rb') as img_file:
+                img_data = b64encode(img_file.read()).decode('utf-8')
+                data['caption_image'] = img_data
+
+            table_data.append({
+                **data,
+                'table_number': table['table_number'],
+                'description': table['description']
+            })
+
+            os.remove(table['path'])
+            os.remove(table['caption_path'])
+
+        return JSONResponse({
+            "success": True,
+            "data": {
+                "tables": table_data
+            }
+        })
+
+    # if table_info:
+    #     return {'success': True, "data": {"tables": table_info}}
     return {'success': False, "message": "Table information not found"}
 
 
