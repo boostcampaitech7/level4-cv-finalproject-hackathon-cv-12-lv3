@@ -81,9 +81,9 @@ class Pdf2Text(object):
                 crop_img = img.crop(new_bbox)
                 table_figure_outputs.append({
                     'obj': self.table_ocr.ocr(crop_img, lang),
-                    'obj_bbox': new_bbox,
+                    'bbox': new_bbox,
                     'type': "Table",
-                    'obj_image': crop_img
+                    'image': crop_img
                 })
                 # final_outputs.append(self.table_ocr.ocr(crop_img))
 
@@ -91,8 +91,9 @@ class Pdf2Text(object):
                 # NOTE 이미지의 경우에는 어떤 방식으로 처리할지 결정되면 진행
                 table_figure_outputs.append({
                     'obj': crop_img,
-                    'obj_bbox': bbox,
-                    'type': "Figure"
+                    'bbox': bbox,
+                    'type': "Figure",
+                    'image': None
                 })
             else:  # 나머지 타입은 처리하지않는 유형이므로 무시
                 pass
