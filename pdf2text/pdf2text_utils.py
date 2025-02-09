@@ -781,16 +781,16 @@ def expand_bbox_with_original(image: Image.Image, bbox: List[int], horizontal_ma
     return (xmin, ymin, xmax, ymax)
 
 
-def matching_captioning(captions: List[Tuple[str, List[int], str]],
-                        objects: List[Tuple[Union[Image.Image, str], List[int], str]]):
+def matching_captioning(captions: List[Dict[str, Union[str, List[int], Image.Image]]],
+                        objects: List[Dict[str, Union[str, List[int], Image.Image]]]):
     """
     캡션과 객체의 위치를 기반으로 캡션과 객체를 매칭하는 함수.
 
     Args:
-        captions (List[Tuple[str, List[int], str]]): 캡션과 그에 해당하는 bounding box, 타입을 포함한 리스트.
-            각 항목은 (caption_text, caption_bbox, caption_type) 형식입니다.
-        objects (List[Tuple[Union[Image.Image, str], List[int], str]]): 객체와 그에 해당하는 bounding box, 타입을 포함한 리스트.
-            각 항목은 (obj, obj_bbox, obj_type) 형식입니다.
+        captions (List[Dict[str, Union[str, List[int], Image.Image]]]): 캡션과 그에 해당하는 bounding box, 타입을 포함한 리스트.
+            각 요소의 key값은 text, bbox, type, image 입니다.
+        objects (List[Dict[str, Union[str, List[int], Image.Image]]]): 객체와 그에 해당하는 bounding box, 타입을 포함한 리스트.
+            각 항목은 key값은 obj, bbox, type, image 형식입니다.
 
     Returns:
         tuple: 두 개의 딕셔너리를 반환합니다.
@@ -801,51 +801,56 @@ def matching_captioning(captions: List[Tuple[str, List[int], str]],
     matched_result = {'figure': [], 'table': []}
     unmatched_result = {'obj': [], 'caption': []}
 
-    idx = 0
-    captions.sort(key=lambda x: (x[1][1], x[1][0]))
-    objects.sort(key=lambda x: (x[1][1], x[1][0]))
+    captions.sort(key=lambda x: (x['bbox'][1], x['bbox'][0]))
+    objects.sort(key=lambda x: (x['bbox'][1], x['bbox'][0]))
 
-    for caption_text, caption_bbox, caption_type in captions:
-        caption_number = extract_caption_number(caption_text)
+    for caption in captions:
+        caption_number = extract_caption_number(caption['text'])
         if caption_number is None:
-            unmatched_result['caption'].append({"item": captions[idx][0],
-                                                "bbox": captions[idx][1],
-                                                'type': captions[idx][2]})
-            idx += 1
+            unmatched_result['caption'].append({"item": caption['text'],
+                                                "bbox": caption['bbox'],
+                                                'type': caption['type'],
+                                                'image': caption['image']})
             continue
 
         matched_object, matched_object_type = None, None
         min_distance = float('inf')
 
-        for obj, obj_bbox, obj_type in objects:
-            if obj_type.lower() != caption_type.split("_")[0].lower():
+        for obj in objects:
+            if obj['type'].lower() != caption['type'].split("_")[0].lower():
                 continue
 
-            cur_distance = calculate_bbox_distance(caption_bbox, obj_bbox)
+            cur_distance = calculate_bbox_distance(
+                caption['bbox'], obj['bbox'])
+
             if cur_distance < min_distance:
                 min_distance = cur_distance
-                matched_object_type = obj_type.lower()
+                matched_object_type = obj['type'].lower()
                 matched_object = {
                     "caption_number": caption_number,
-                    'obj': obj,
-                    'obj_bbox': obj_bbox,
-                    'caption_bbox': caption_bbox,
-                    'caption_text': caption_text
+                    'obj': obj['obj'],
+                    'obj_image': obj['image'],
+                    'obj_bbox': obj['bbox'],
+                    'caption_bbox': caption['bbox'],
+                    'caption_text': caption['text'],
+                    'caption_image': caption['image']
                 }
+
         if matched_object:
-            objects = [obj for obj in objects if obj[0]
+            objects = [obj for obj in objects if obj['obj']
                        != matched_object['obj']]
             matched_result[matched_object_type].append(matched_object)
         else:
-            unmatched_result['caption'].append({"item": captions[idx][0],
-                                                "bbox": captions[idx][1],
-                                                'type': captions[idx][2]})
-        idx += 1
+            unmatched_result['caption'].append({"item": caption['text'],
+                                                "bbox": caption['bbox'],
+                                                'type': caption['type'],
+                                                'image': caption['image']})
 
     if len(objects) != 0:
-        unmatched_result['obj'] = [{"item": obj[0],
-                                    "bbox": obj[1],
-                                    "type": obj[2]} for obj in objects]
+        unmatched_result['obj'] = [{"item": obj['obj'],
+                                    "bbox": obj['bbox'],
+                                    "type": obj['type'],
+                                    "image": obj['image']} for obj in objects]
 
     return matched_result, unmatched_result
 

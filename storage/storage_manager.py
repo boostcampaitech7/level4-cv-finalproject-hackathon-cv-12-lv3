@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class ObjectStorageManager:
     def __init__(self):
         self.service_name = 's3'
@@ -26,7 +27,7 @@ class ObjectStorageManager:
             )
         )
 
-    def upload_pdf(self, file_path: str, 
+    def upload_pdf(self, file_path: str,
                    bucket_name: str) -> Dict[str, str]:
         """PDF 파일 OS에 업로드 하고 URL과 경로 반환"""
         file_name = os.path.basename(file_path)
@@ -49,9 +50,9 @@ class ObjectStorageManager:
         except Exception as e:
             print(f"pdf 파일 업로드 중 에러 발생: {str(e)}")
             return None
-        
+
     def upload_figure(self, file_path: str,
-                            bucket_name: str) -> Dict[str, str]:
+                      bucket_name: str) -> Dict[str, str]:
         """Figure 파일 업로드"""
         file_name = os.path.basename(file_path)
         storage_path = f"figures/{file_name}"
@@ -73,9 +74,57 @@ class ObjectStorageManager:
         except Exception as e:
             print(f"Figure 파일 업로드 중 에러 발생: {str(e)}")
             return None
-        
+
+    def upload_caption(self, file_path: str,
+                       bucket_name: str) -> Dict[str, str]:
+        """Caption 이미지 파일 업로드"""
+        file_name = os.path.basename(file_path)
+        storage_path = f"captions/{file_name}"
+
+        try:
+            self.s3_client.upload_file(
+                file_path,
+                bucket_name,
+                storage_path,
+                ExtraArgs={'ACL': 'private'}
+            )
+
+            url = f"https://kr.object.ncloudstorage.com/{bucket_name}/{storage_path}"
+
+            return {
+                "url": url,
+                "path": storage_path
+            }
+        except Exception as e:
+            print(f"Caption 이미지 파일 업로드 중 에러 발생: {str(e)}")
+            return None
+
+    def upload_table(self, file_path: str,
+                     bucket_name: str) -> Dict[str, str]:
+        """Table 이미지 파일 업로드"""
+        file_name = os.path.basename(file_path)
+        storage_path = f"tables/{file_name}"
+
+        try:
+            self.s3_client.upload_file(
+                file_path,
+                bucket_name,
+                storage_path,
+                ExtraArgs={'ACL': 'private'}
+            )
+
+            url = f"https://kr.object.ncloudstorage.com/{bucket_name}/{storage_path}"
+
+            return {
+                "url": url,
+                "path": storage_path
+            }
+        except Exception as e:
+            print(f"Table 이미지 파일 업로드 중 에러 발생: {str(e)}")
+            return None
+
     def upload_timeline(self, file_path: str,
-                            bucket_name: str) -> Dict[str, str]:
+                        bucket_name: str) -> Dict[str, str]:
         """timeline 파일 업로드"""
         file_name = os.path.basename(file_path)
         storage_path = f"timeline/{file_name}"
@@ -97,9 +146,9 @@ class ObjectStorageManager:
         except Exception as e:
             print(f"timeline 파일 업로드 중 에러 발생: {str(e)}")
             return None
-        
+
     def upload_script(self, file_path: str,
-                            bucket_name: str) -> Dict[str, str]:
+                      bucket_name: str) -> Dict[str, str]:
         """script 파일 업로드"""
         file_name = os.path.basename(file_path)
         storage_path = f"script/{file_name}"
@@ -121,9 +170,9 @@ class ObjectStorageManager:
         except Exception as e:
             print(f"audio 파일 업로드 중 에러 발생: {str(e)}")
             return None
-        
+
     def upload_audio(self, file_path: str,
-                            bucket_name: str) -> Dict[str, str]:
+                     bucket_name: str) -> Dict[str, str]:
         """audio 파일 업로드"""
         file_name = os.path.basename(file_path)
         storage_path = f"audio/{file_name}"
@@ -145,9 +194,9 @@ class ObjectStorageManager:
         except Exception as e:
             print(f"audio 파일 업로드 중 에러 발생: {str(e)}")
             return None
-        
+
     def upload_thumbnail(self, file_path: str,
-                            bucket_name: str) -> Dict[str, str]:
+                         bucket_name: str) -> Dict[str, str]:
         """thumbnail 파일 업로드"""
         file_name = os.path.basename(file_path)
         storage_path = f"thumbnail/{file_name}"
@@ -169,7 +218,7 @@ class ObjectStorageManager:
         except Exception as e:
             print(f"thumbnail 파일 업로드 중 에러 발생: {str(e)}")
             return None
-        
+
     def download_file(self, file_url: str, local_path: str, bucket_name: str) -> bool:
         try:
             self.s3_client.download_file(
