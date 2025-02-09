@@ -198,11 +198,12 @@ class Pdf2Text(object):
 
             elif ele_type == ElementType.FIGURE:
                 new_bbox = expand_bbox_with_original(img, bbox, 10, 10)
+                crop_img = img.crop(new_bbox)
                 table_figure_outputs.append({
-                    'obj': new_bbox,
-                    'bbox': bbox,
+                    'obj': crop_img,
+                    'bbox': new_bbox,
                     'type': "Figure",
-                    'image': new_bbox
+                    'image': crop_img
                 })
             else:  # 나머지 타입은 처리하지않는 유형이므로 무시
                 pass
