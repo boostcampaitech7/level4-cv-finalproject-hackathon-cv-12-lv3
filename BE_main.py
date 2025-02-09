@@ -497,11 +497,9 @@ async def get_script(req: PdfRequest,
 
 @app.post("/pdf/get_table")
 async def get_table(req: PdfRequest,
-                    file_manager: FileManager = Depends(get_file_manager),
-                    additional_uploader: AdditionalFileUploader = Depends(get_add_file_uploader)):
+                    file_manager: FileManager = Depends(get_file_manager)):
     pdf_id, user_id = req.pdf_id, req.user_id
     table_paths = file_manager.get_table(user_id, pdf_id)
-    # table_info = additional_uploader.search_table_file(user_id, pdf_id)
 
     if table_paths:
         table_data = []

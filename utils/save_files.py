@@ -434,6 +434,7 @@ class FileManager:
                     'description': table.get('description', ''),
                     'caption_path': path_dict['caption_path']
                 })
+            return table_paths
 
         except Exception as e:
             print(f"Table 가져오기 실패: {str(e)}")
