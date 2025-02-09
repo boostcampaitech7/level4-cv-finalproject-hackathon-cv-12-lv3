@@ -4,6 +4,7 @@ import requests
 import json
 from http import HTTPStatus
 
+
 class EmbeddingAPI(BaseAPIExecutor):
     def __init__(self, host, api_key, request_id):
         super().__init__(host, api_key, request_id)
@@ -28,13 +29,14 @@ class SegmentationAPI(BaseAPIExecutor):
         }
         result = self.execute(self._endpoint, payload)
         return result.get("topicSeg", "Error")
-    
+
+
 class ChatCompletionsExecutor(BaseAPIExecutor):
     def __init__(self, host, api_key, request_id):
         super().__init__(host, api_key, request_id)
         self._endpoint = API_CONFIG['chat_completion_endpoint']
 
-    def execute(self, completion_request, stream=True):
+    def execute(self, completion_request, stream=True, return_type=None):
         headers = {
             'Content-Type': 'application/json; charset=utf-8',
             'Authorization': self._api_key,
@@ -43,8 +45,12 @@ class ChatCompletionsExecutor(BaseAPIExecutor):
         }
 
         if stream:
+            if return_type == "Response":
+                return requests.post(self._host + self._endpoint,
+                                     headers=headers, json=completion_request, stream=True)
+
             with requests.post(self._host + self._endpoint,
-                        headers=headers, json=completion_request, stream=True) as r:
+                               headers=headers, json=completion_request, stream=True) as r:
                 if r.status_code == HTTPStatus.OK:
                     final_result = None
                     for line in r.iter_lines():
@@ -52,7 +58,8 @@ class ChatCompletionsExecutor(BaseAPIExecutor):
                             decoded_line = line.decode("utf-8")
                             if decoded_line.startswith("data:"):
                                 try:
-                                    data = json.loads(decoded_line.replace("data:", "").strip())
+                                    data = json.loads(
+                                        decoded_line.replace("data:", "").strip())
                                     if "message" in data:
                                         final_result = data  # 마지막 결과 저장
                                 except json.JSONDecodeError:
@@ -66,10 +73,12 @@ class ChatCompletionsExecutor(BaseAPIExecutor):
                             "outputLength": final_result["outputLength"]
                         }
                 else:
-                    raise ValueError(f"오류 발생[1]: HTTP {r.status_code}, 메시지: {r.text}")
+                    raise ValueError(
+                        f"오류 발생[1]: HTTP {r.status_code}, 메시지: {r.text}")
         else:
             return super().execute(self._endpoint, payload=completion_request)
-                
+
+
 class SummarizationExecutor(BaseAPIExecutor):
     def __init__(self, host, api_key, request_id):
         super().__init__(host, api_key, request_id)
@@ -86,5 +95,6 @@ class SummarizationExecutor(BaseAPIExecutor):
         if status == HTTPStatus.OK and "result" in res:
             return res["result"]["text"]
         else:
-            error_message = res.get("status", {}).get("message", "Unknown error") if isinstance(res, dict) else "Unknown error"
+            error_message = res.get("status", {}).get(
+                "message", "Unknown error") if isinstance(res, dict) else "Unknown error"
             raise ValueError(f"오류 발생[2]: HTTP {status}, 메시지: {error_message}")
