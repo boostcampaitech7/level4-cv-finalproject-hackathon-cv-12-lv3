@@ -116,7 +116,8 @@ class FileManager:
                     response = conversation_with_images("deepseek-ai/deepseek-vl-7b-chat",
                                                         [image],
                                                         image_description=figure['caption_text']
-                                                        if figure['caption_text'] else caption)
+                                                        if figure['caption_text'] else caption,
+                                                        timeout=600)
                     trans_response = translate_clova(
                         response, completion_executor)
 

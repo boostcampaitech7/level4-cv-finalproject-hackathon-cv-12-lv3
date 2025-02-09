@@ -3,7 +3,7 @@ from tqdm import tqdm
 from config.config import AI_CONFIG, API_CONFIG
 from utils import MultiChatManager, FileManager, PaperSummarizer
 from utils import process_query_with_reranking_compare, split_sentences, group_academic_paragraphs, write_full_script, script_to_speech
-from utils import chunkify_to_num_token, chunkify_with_overlap
+from utils import chunkify_to_num_token, chunkify_with_overlap, query_and_respond
 from api import EmbeddingAPI, ChatCompletionsExecutor, SummarizationExecutor
 from datebase import DatabaseConnection, DocumentUploader, SessionManager, PaperManager, ChatHistoryManager
 from pdf2text import Pdf2Text, pdf_to_image
@@ -14,6 +14,8 @@ import traceback
 import subprocess
 import json
 import os
+import gc
+import torch
 from PIL import Image
 
 def run_translate(file_name):
@@ -56,7 +58,7 @@ if __name__ == '__main__':
     summarized_documents = []
     summary_list = []
     last_three_sentences = []
-    all_match_res = []
+    all_match_res = {'figure': [], 'table': []}
 
     # 데이터베이스 연결
     db_connection = DatabaseConnection()
@@ -90,11 +92,17 @@ if __name__ == '__main__':
         new_data = translation_result['translated_json']
 
         for i, image in tqdm(enumerate(images), desc="이미지 처리 중"):
-            raw_text, match_res, unmatch_res = pdf2text.recognize(image, lang)
+            raw_text = pdf2text.recognize_only_text(image, lang)
+            print(f"raw_text 값: {raw_text}")
+            match_res, unmatch_res = pdf2text.recognize_only_table_figure(image, lang)
+            print(f"match_res 값: {match_res}")
+            print(f"unmatch_res 값: {unmatch_res}")
 
             if match_res:
-                match_res['page'] = i + 1
-                all_match_res.append(match_res)
+                if 'figure' in match_res:
+                    all_match_res['figure'].extend(match_res['figure'])
+                if 'table' in match_res:
+                    all_match_res['table'].extend(match_res['table'])
             sentences = split_sentences(raw_text)
             if last_three_sentences:
                 sentences = last_three_sentences + sentences
@@ -111,6 +119,10 @@ if __name__ == '__main__':
                         "page": int(i + 1),
                         "chunk": chunk
                     })
+
+        del pdf2text
+        torch.cuda.empty_cache()
+        gc.collect()
 
         for doc in tqdm(chunked_documents, desc="Generating Embeddings", total=len(chunked_documents)):
             embedding = model.encode(doc["chunk"])
@@ -175,18 +187,32 @@ if __name__ == '__main__':
             user_input = input("사용자: ")
             if user_input.lower().replace(" ", "") in ['exit', 'quit', '대화종료']:
                 break
-
-            relevant_response = process_query_with_reranking_compare(
-                query=user_input,
-                conn=conn,
-                model=model,
-                reranker=reranker_model,
-                completion_executor=completion_executor,
-                user_id=user_id,
-                paper_id=paper_id,
-                top_k= 3 if lang == 'en' else 2,
-                chat_manager=chat_manager
-            )
+            
+            fig_table_keywords = ['figure', '피규어', 'table', '테이블']
+            is_figure_query = any(keyword in user_input.lower() for keyword in fig_table_keywords)
+            
+            if is_figure_query:
+                relevant_response = query_and_respond(
+                    query=user_input,
+                    conn=conn,
+                    model=model,
+                    user_id=user_id,
+                    paper_id=paper_id,
+                    top_k=3,
+                    chat_manager=chat_manager
+                )
+            else:
+                relevant_response = process_query_with_reranking_compare(
+                    query=user_input,
+                    conn=conn,
+                    model=model,
+                    reranker=reranker_model,
+                    completion_executor=completion_executor,
+                    user_id=user_id,
+                    paper_id=paper_id,
+                    top_k=3,
+                    chat_manager=chat_manager
+                )
 
             context_result = chat_manager.handle_question(
                 user_input, user_id=user_id, paper_id=paper_id)

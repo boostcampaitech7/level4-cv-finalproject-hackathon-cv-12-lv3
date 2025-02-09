@@ -55,7 +55,10 @@ class MultiChatManager:
             - 제공된 Reference만 사용, 외부 지식 불가
             - "논문에서는~" 형식으로 출처 명시
             - [Page {숫자}] 필수 표기
-            - 참조 논문 목록 필수 추가
+            - Figure/Table 질문시:
+                * 캡션 전체 상세 설명
+                * 시각적 요소나 데이터 구조 설명
+                * 관련된 본문 내용도 포함
 
             2. insufficient:
             - 제공 message로 시작
@@ -79,6 +82,11 @@ class MultiChatManager:
             - 메타데이터만 사용 (제목/저자/년도/초록)
             - "이 논문은 [제목]입니다" 형식 준수
 
+            특히 Figure나 Table 관련 질문에 대해:
+            1. 해당 Figure/Table의 내용이 있다면 반드시 설명해주세요
+            2. "내용이 없다"고 하기 전에 제공된 내용을 다시 한번 확인해주세요
+            3. Figure/Table의 세부 내용과 의미를 자세히 설명해주세요
+            
             [실패 조건]
             - Reference 있을 때 외부 지식 사용
             - 비학술적 내용 포함
@@ -118,7 +126,8 @@ class MultiChatManager:
         if context:
             context_message = {
                 "role": "system",
-                "content": f"Reference documents:\n{context}"
+                # "content": f"Reference documents:\n{context}"
+                "content": f"{context['content']}"
             }
             current_messages.append(context_message)
 

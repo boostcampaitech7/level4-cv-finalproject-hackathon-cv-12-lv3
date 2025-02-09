@@ -1,15 +1,29 @@
 from langchain.document_loaders import PyPDFLoader
 from summarizer import Summarizer
 from transformers import AutoConfig, AutoTokenizer, AutoModel
+import torch
 
 class PaperSummarizer:
     def __init__(self):
-        custom_config = AutoConfig.from_pretrained('allenai/scibert_scivocab_uncased')
-        custom_config.output_hidden_states=True
+        self.custom_config = AutoConfig.from_pretrained('allenai/scibert_scivocab_uncased')
+        self.custom_config.output_hidden_states=True
         self.custom_tokenizer = AutoTokenizer.from_pretrained('allenai/scibert_scivocab_uncased')
-        custom_model = AutoModel.from_pretrained('allenai/scibert_scivocab_uncased', config=custom_config)
+        self.custom_model = AutoModel.from_pretrained('allenai/scibert_scivocab_uncased', config=self.custom_config)
         
-        self.model = Summarizer(custom_model=custom_model, custom_tokenizer=self.custom_tokenizer)
+        self.model = Summarizer(custom_model=self.custom_model, custom_tokenizer=self.custom_tokenizer)
+        
+    def clean_up(self):
+        if hasattr(self, 'custom_model'):
+            del self.custom_model
+        if hasattr(self, 'model'):
+            del self.model
+        
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    
+    # 자동 메모리 정리
+    def __del__(self):
+        self.clean_up()
 
     def generate_summary(self, pdf_filepath):
         try:
@@ -52,7 +66,7 @@ class PaperSummarizer:
             # 최종 요약 생성
             combined_summary = " ".join(label_summaries.values())
             final_summary = self.model(combined_summary, num_sentences=30)
-
+            
             return final_summary
 
         except Exception as e:

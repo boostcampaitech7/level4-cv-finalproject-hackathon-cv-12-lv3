@@ -3,6 +3,7 @@ from typing import List
 from sentence_transformers.cross_encoder import CrossEncoder
 import numpy as np
 import time
+import re
 
 def is_follow_up_request(query:str, model) -> bool:
     follow_up_patterns = [
@@ -38,6 +39,53 @@ def is_paper_info_request(query: str, model) -> bool:
     print(f"논문 정보 요청 점수: {max(similarities)}")
 
     return max(similarities) > 0.7
+
+def get_figure_table_info(query: str, conn, user_id: str, paper_id: int):
+    """ 쿼리 검색 시 Figure/Table 질문에 대한 답변 검색 """
+    try:
+        figure_pattern = re.search(r'figure\s*(\d+)', query.lower())
+        table_pattern = re.search(r'table\s*(\d+)', query.lower())
+        
+        cursor = conn.cursor()
+        
+        if figure_pattern:
+            number = figure_pattern.group(1)
+            
+            cursor.execute("""
+                SELECT caption_info, description
+                FROM public.figure_info
+                WHERE user_id = %s
+                AND paper_id = %s
+                AND caption_number = %s
+            """, (user_id, paper_id, number))
+            
+            result = cursor.fetchone()
+            if result:
+                return {
+                    "type": "figure",
+                    "message": f"Figure {number}에 대한 설명입니다.:\n{result[0]}\n\n추가 설명:\n{result[1] if result[1] else ''}"
+                }
+        elif table_pattern:
+            number = table_pattern.group(1)
+            cursor.execute("""
+                SELECT description
+                FROM public.table_info
+                WHERE user_id = %s
+                AND paper_id = %s
+                AND caption_number = %s
+            """, (user_id, paper_id, number))
+            
+            result = cursor.fetchone()
+            if result:
+                return {
+                    "type": "table",
+                    "message": f"Table {number}에 대한 설명입니다.\n{result[0]}"
+                }
+                
+        return None
+    except Exception as e:
+        print(f"Figure/Table 질의 응답 검색 중 에러 발생: {str(e)}")
+        return None
 
 def search_similar_doc(query_vector, conn, user_id, paper_id, top_k=10):
     """
@@ -93,6 +141,10 @@ def query_and_respond(query: str, conn, model, user_id, paper_id,
     :param top_k: 벡터 서치에서 추출할 Reference의 개수
     """
     try:
+        ft_info = get_figure_table_info(query, conn, user_id, paper_id)
+        if ft_info:
+            return ft_info
+        
         if is_follow_up_request(query, model):
             last_response = chat_manager.get_last_response(user_id, paper_id)
             if last_response and last_response['type'] in ['unrelated', 'no_result']:
@@ -118,7 +170,7 @@ def query_and_respond(query: str, conn, model, user_id, paper_id,
         if matches:
             score = matches[0]['score']
             print(score)
-            if score > 0.5:
+            if score > 0.4:
                 return {
                     "type": "reference",
                     "content": "\n\n".join([
@@ -126,7 +178,7 @@ def query_and_respond(query: str, conn, model, user_id, paper_id,
                         for match in matches[:top_k]
                     ])
                 }
-            elif 0.35 <= score <= 0.5: 
+            elif 0.3 <= score <= 0.4: 
                 return {
                     "type": "insufficient",
                     "message": "제공된 Reference에서는 내용이 부족해요. 외부 자료를 통해 추가로 설명해드릴까요?"
