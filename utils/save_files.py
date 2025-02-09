@@ -352,22 +352,38 @@ class FileManager:
 
             figure_paths = []
             for figure in figure_info:
-                temp_path = f"temp_figure_{paper_id}_{figure['caption_number']}.png"
-                downloaded = self.storage_manager.download_file(
+                path_dict = {
+                    "figure_path": f"temp_figure_{paper_id}_{figure['caption_number']}.png",
+                    "caption_path": f"temp_caption_{paper_id}_figure_{figure['caption_number']}.png"
+                }
+
+                figure_downloaded = self.storage_manager.download_file(
                     file_url=figure['storage_path'],
-                    local_path=temp_path,
+                    local_path=path_dict['figure_path'],
                     bucket_name=os.getenv('NCP_BUCKET_NAME')
                 )
 
-                if not downloaded:
+                caption_downloaded = self.storage_manager.download_file(
+                    file_url=figure['caption_path'],
+                    local_path=path_dict['caption_path'],
+                    bucket_name=os.getenv('NCP_BUCKET_NAME')
+                )
+
+                if not figure_downloaded:
                     print(f"Figure {figure['caption_number']} 다운로드 실패")
                     continue
 
+                if not caption_downloaded:
+                    print(
+                        f"Figure {figure['caption_number']}번의 Caption 다운로드 실패")
+                    continue
+
                 figure_paths.append({
-                    'path': temp_path,
+                    'path': path_dict['figure_path'],
                     'figure_number': figure['caption_number'],
                     'caption_info': figure.get('caption_info', ''),
-                    'description': figure.get('description', '')
+                    'description': figure.get('description', ''),
+                    'caption_path': path_dict['caption_path']
                 })
 
             return figure_paths
