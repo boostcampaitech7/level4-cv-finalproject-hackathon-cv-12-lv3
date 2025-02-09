@@ -173,8 +173,12 @@ def query_and_respond(query: str, conn, model, user_id, paper_id,
             if score > 0.4:
                 return {
                     "type": "reference",
+                    # "content": "\n\n".join([
+                    #     f"Reference (Page {match['page']}): {match['text']}"
+                    #     for match in matches[:top_k]
+                    # ])
                     "content": "\n\n".join([
-                        f"Reference (Page {match['page']}): {match['text']}"
+                        f"{match['text']} [Page {match['page']}]"
                         for match in matches[:top_k]
                     ])
                 }
@@ -282,8 +286,12 @@ def query_and_respond_reranker_compare(query: str, conn, model, reranker_model, 
         print("=" * 50)
 
         # 5. 최종 결과 반환 (리랭킹된 결과 사용)
+        # references = "\n\n".join([
+        #     f"Reference (Page {match['page']}): {match['text']}"
+        #     for match in matches_reranked[:top_k]  
+        # ])
         references = "\n\n".join([
-            f"Reference (Page {match['page']}): {match['text']}"
+            f"{match['text']} [Page {match['page']}]"
             for match in matches_reranked[:top_k]  
         ])
         return references
@@ -476,9 +484,15 @@ def process_query_with_reranking_compare(
                     end_idx = start_idx + chunk_size
                     query_results = all_results_reranked[start_idx:end_idx]
                     
+                    # results_per_query.append(
+                    #     f"서브쿼리: {subquery}\n" +
+                    #     "\n".join([f"Reference (Page {match['page']}): {match['text']}"
+                    #             for match in query_results[:top_k]])
+                    # )
+
                     results_per_query.append(
                         f"서브쿼리: {subquery}\n" +
-                        "\n".join([f"Reference (Page {match['page']}): {match['text']}"
+                        "\n".join([f"{match['text']} [Page {match['page']}]"
                                 for match in query_results[:top_k]])
                     )
 

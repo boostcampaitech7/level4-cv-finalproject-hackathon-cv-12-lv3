@@ -13,13 +13,17 @@ class PaperSummarizer:
         self.model = Summarizer(custom_model=self.custom_model, custom_tokenizer=self.custom_tokenizer)
         
     def clean_up(self):
-        if hasattr(self, 'custom_model'):
-            del self.custom_model
-        if hasattr(self, 'model'):
-            del self.model
-        
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        try:
+            if hasattr(self, 'custom_model'):
+                del self.custom_model
+            if hasattr(self, 'model'):
+                del self.model
+            
+            if 'torch' in globals() and torch is not None:
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+        except:
+            pass
     
     # 자동 메모리 정리
     def __del__(self):
