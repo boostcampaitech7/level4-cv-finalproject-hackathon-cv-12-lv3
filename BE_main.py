@@ -34,6 +34,7 @@ from summarizer import Summarizer
 
 logger = logging.getLogger(__name__)
 
+
 @lru_cache()
 def get_db_connection():
     db_connection = DatabaseConnection()
@@ -93,9 +94,11 @@ app.add_middleware(
     allow_headers=["*"],  # 모든 헤더 허용
 )
 
+
 class InfoType(str, Enum):
     all = "all"
     head = "head"
+
 
 class BaseRequest(BaseModel):
     pdf_id: int
@@ -117,6 +120,7 @@ class PdfRequest(BaseRequest):
     ):
         return cls(user_id=user_id, pdf_id=pdf_id)
 
+
 class MultiPdfRequest(BaseModel):
     pdf_ids: List[int]
     user_id: str = "admin"
@@ -129,6 +133,7 @@ class MultiPdfRequest(BaseModel):
     ):
         pdf_id_list = [int(id_) for id_ in pdf_ids.split(',')]
         return cls(user_id=user_id, pdf_ids=pdf_id_list)
+
 
 class ChatRequest(BaseRequest):
     message: str = ""
@@ -171,7 +176,7 @@ async def upload_pdf(file: UploadFile,
 
         paper_id = file_manager.store_paper(
             file_content, paper_info, user_id)
-        
+
         # 임시 대화 1개 생성
         chat_manager.store_chat(user_id, paper_id, 'assistant',
                                 "안녕하세요 당신의 논문 공부를 도와드릴 SummarAI입니다! 무엇을 도와드릴까요?",
@@ -352,6 +357,8 @@ async def pdf2text_table_figure(req: PdfRequest,
     return {"success": False, "message": "Embedding 값 저장 중 오류 발생"}
 
 # 요약 및 오디오, 태그, 타임라인 파일 생성하기
+
+
 @app.post("/pdf/summarize", response_model=BaseResponse, response_model_exclude_unset=True)
 async def summarize_and_get_files(req: PdfRequest,
                                   file_manager: FileManager = Depends(get_file_manager)):
@@ -417,15 +424,25 @@ async def get_figure(req: PdfRequest,
     if fig_paths:
         figures_data = []
         for fig in fig_paths:
+            data = {}
+
             with open(fig['path'], 'rb') as img_file:
                 img_data = b64encode(img_file.read()).decode('utf-8')
-                figures_data.append({
-                    'image': img_data,
-                    'figure_number': fig['figure_number'],
-                    'caption_info': fig['caption_info'],
-                    'description': fig['description']
-                })
+                data['image'] = img_data
+
+            with open(fig['caption_path'], 'rb') as img_file:
+                img_data = b64encode(img_file.read()).decode('utf-8')
+                data['caption_image'] = img_data
+
+            figures_data.append({
+                **data,
+                'figure_number': fig['figure_number'],
+                'caption_info': fig['caption_info'],
+                'description': fig['description'],
+            })
+
             os.remove(fig['path'])
+            os.remove(fig['caption_path'])
 
         return JSONResponse({
             "status": "success",
@@ -480,12 +497,40 @@ async def get_script(req: PdfRequest,
 
 @app.post("/pdf/get_table")
 async def get_table(req: PdfRequest,
-                    additional_uploader: AdditionalFileUploader = Depends(get_add_file_uploader)):
+                    file_manager: FileManager = Depends(get_file_manager)):
     pdf_id, user_id = req.pdf_id, req.user_id
-    table_info = additional_uploader.search_table_file(user_id, pdf_id)
+    table_paths = file_manager.get_table(user_id, pdf_id)
 
-    if table_info:
-        return {'success': True, "data": {"tables": table_info}}
+    if table_paths:
+        table_data = []
+        for table in table_paths:
+            data = {}
+            with open(table['path'], 'rb') as img_file:
+                img_data = b64encode(img_file.read()).decode('utf-8')
+                data['image'] = img_data
+
+            with open(table['caption_path'], 'rb') as img_file:
+                img_data = b64encode(img_file.read()).decode('utf-8')
+                data['caption_image'] = img_data
+
+            table_data.append({
+                **data,
+                'table_number': table['table_number'],
+                'description': table['description']
+            })
+
+            os.remove(table['path'])
+            os.remove(table['caption_path'])
+
+        return JSONResponse({
+            "success": True,
+            "data": {
+                "tables": table_data
+            }
+        })
+
+    # if table_info:
+    #     return {'success': True, "data": {"tables": table_info}}
     return {'success': False, "message": "Table information not found"}
 
 
@@ -498,6 +543,7 @@ async def get_users_hist(req: PdfRequest,
     if hist_info:
         return {'success': True, "data": hist_info}
     return {'success': False, 'message': "No chat history found"}
+
 
 @app.post("/pdf/get_chat_hist")
 async def get_chat_hist(req: PdfRequest,
@@ -523,6 +569,7 @@ async def get_summary(req: PdfRequest,
         }
     return {"success": False, "message": "요약 불러오기 중 에러 발생"}
 
+
 @app.post("/pdf/get_tags")
 async def get_tags(req: PdfRequest,
                    additional_uploader: AdditionalFileUploader = Depends(get_add_file_uploader)):
@@ -536,9 +583,10 @@ async def get_tags(req: PdfRequest,
         }
     return {"success": False, "message": "태그 정보를 찾을 수 없습니다."}
 
+
 @app.post("/pdf/get_summary_pdf_id")
 async def get_summary_pdf_id(req: PdfRequest,
-                            paper_manager: PaperManager = Depends(get_paper_manager)):
+                             paper_manager: PaperManager = Depends(get_paper_manager)):
     user_id, pdf_id = req.user_id, req.pdf_id
     summary_pdf_id = paper_manager.get_summary_pdf_id(user_id)
 
@@ -549,11 +597,14 @@ async def get_summary_pdf_id(req: PdfRequest,
         }
     return {"success": False, "message": "요약된 PDF ID를 찾을 수 없습니다."}
 
+
 @app.post("/pdf/get_all_summary_info/{info_type}")
 async def get_all_summary_info(info_type: InfoType,
                                req: MultiPdfRequest,
-                               paper_manager: PaperManager = Depends(get_paper_manager),
-                               file_manager: FileManager = Depends(get_file_manager),
+                               paper_manager: PaperManager = Depends(
+                                   get_paper_manager),
+                               file_manager: FileManager = Depends(
+                                   get_file_manager),
                                additional_uploader: AdditionalFileUploader = Depends(get_add_file_uploader)):
     user_id = req.user_id
     all_pdf_data = []
@@ -582,7 +633,8 @@ async def get_all_summary_info(info_type: InfoType,
             if thumbnail_path:
                 temp_files.append(thumbnail_path)
                 with open(thumbnail_path, 'rb') as f:
-                    response_data["files"]["thumbnail"] = b64encode(f.read()).decode('utf-8')
+                    response_data["files"]["thumbnail"] = b64encode(
+                        f.read()).decode('utf-8')
                 os.remove(thumbnail_path)
 
             # 상세 보기 페이지를 들어가는 경우 (all)
@@ -593,7 +645,8 @@ async def get_all_summary_info(info_type: InfoType,
                 if fig_paths:
                     for fig in fig_paths:
                         with open(fig['path'], 'rb') as img_file:
-                            img_data = b64encode(img_file.read()).decode('utf-8')
+                            img_data = b64encode(
+                                img_file.read()).decode('utf-8')
                             figures_data.append({
                                 'image': img_data,
                                 'figure_number': fig['figure_number'],
@@ -610,15 +663,17 @@ async def get_all_summary_info(info_type: InfoType,
                 if timeline_path:
                     temp_files.append(timeline_path)
                     with open(timeline_path, 'rb') as f:
-                        response_data["files"]["timeline"] = f.read().decode('utf-8')
+                        response_data["files"]["timeline"] = f.read().decode(
+                            'utf-8')
                     os.remove(timeline_path)
 
                 # 6. Table 정보 가져오기
-                table_info = additional_uploader.search_table_file(user_id, pdf_id)
+                table_info = additional_uploader.search_table_file(
+                    user_id, pdf_id)
                 response_data["json_data"]["tables"] = table_info
 
             all_pdf_data.append(response_data)
-        
+
         for temp_file in temp_files:
             try:
                 if os.path.exists(temp_file):

@@ -189,7 +189,7 @@ class PaperManager(BaseDBHandler):
             }
         else:
             return None
-        
+
     def get_summary_pdf_id(self, user_id: str):
         query = """
             SELECT DISTINCT
@@ -207,6 +207,7 @@ class PaperManager(BaseDBHandler):
             paper_ids = [row[0] for row in result]
             return paper_ids
         return None
+
 
 class DocumentUploader:
     def __init__(self, connection):
@@ -517,30 +518,33 @@ class AdditionalFileUploader(BaseDBHandler):
         self.conn = connection
 
     def insert_figure_file(self, user_id, paper_id,
-                           storage_path, caption_number, 
-                           caption_info, description):
+                           storage_path, caption_number,
+                           caption_info, description, caption_path):
         query = """
             INSERT INTO public.figure_info
             (user_id, paper_id, storage_path, 
-            caption_number, caption_info, description)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            caption_number, caption_info, description, caption_path)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
         """
 
         self.execute_query_one(query, (user_id, paper_id,
-                                       storage_path, caption_number, 
-                                       caption_info, description))
+                                       storage_path, caption_number,
+                                       caption_info, description, caption_path))
 
     def insert_table_file(self, user_id, paper_id,
-                          table_obj, caption_number, description):
+                          table_obj, caption_number, description,
+                          storage_path, caption_path):
         query = """
             INSERT INTO public.table_info
             (user_id, paper_id, table_obj,
-            caption_number, description)
-            VALUES (%s, %s, %s, %s, %s)
+            caption_number, description,
+            storage_path, caption_path)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
         """
 
         self.execute_query_one(query, (user_id, paper_id,
-                                       table_obj, caption_number, description))
+                                       table_obj, caption_number, description,
+                                       storage_path, caption_path))
 
     def insert_tag_file(self, user_id, paper_id,
                         tag_text):
@@ -579,7 +583,7 @@ class AdditionalFileUploader(BaseDBHandler):
         query = """
             SELECT 
                 storage_path, caption_number,
-                caption_info, description
+                caption_info, description, caption_path
             FROM public.figure_info
             WHERE user_id = %s
             AND paper_id = %s
@@ -593,7 +597,8 @@ class AdditionalFileUploader(BaseDBHandler):
                 'storage_path': figure[0],
                 'caption_number': figure[1],
                 'caption_info': figure[2],
-                'description': figure[3]
+                'description': figure[3],
+                'caption_path': figure[4]
             })
 
         return result
@@ -601,7 +606,8 @@ class AdditionalFileUploader(BaseDBHandler):
     def search_table_file(self, user_id, paper_id):
         query = """
             SELECT 
-                table_obj, caption_number, description
+                table_obj, caption_number, description,
+                storage_path, caption_path
             FROM public.table_info
             WHERE user_id = %s
             AND paper_id = %s
@@ -614,7 +620,9 @@ class AdditionalFileUploader(BaseDBHandler):
             result.append({
                 'table_obj': table[0],
                 'caption_number': table[1],
-                'description': table[2]
+                'description': table[2],
+                'storage_path': table[3],
+                'caption_path': table[4]
             })
 
         return result

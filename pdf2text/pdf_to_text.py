@@ -57,8 +57,12 @@ class Pdf2Text(object):
 
                 # caption일 경우 따로 추출
                 if layout_ele['caption'] is not None:
-                    caption_outputs.append(
-                        (text_ocr_output, bbox, layout_ele['caption']))
+                    caption_outputs.append({
+                        'text': text_ocr_output,
+                        'bbox': bbox,
+                        'type': layout_ele['caption'],
+                        'image': crop_img
+                    })
                 else:
                     final_outputs.append(text_ocr_output)
 
@@ -75,13 +79,23 @@ class Pdf2Text(object):
                 # NOTE TABLE은 정보가 잘리는 경우가 존재하기 때문에 기존 이미지에서 bbox 재조정
                 new_bbox = expand_bbox_with_original(img, bbox, 10, 10)
                 crop_img = img.crop(new_bbox)
-                table_figure_outputs.append(
-                    (self.table_ocr.ocr(crop_img, lang), new_bbox, "Table"))
+                table_figure_outputs.append({
+                    'obj': self.table_ocr.ocr(crop_img, lang),
+                    'bbox': new_bbox,
+                    'type': "Table",
+                    'image': crop_img
+                })
                 # final_outputs.append(self.table_ocr.ocr(crop_img))
 
             elif ele_type == ElementType.FIGURE:
                 # NOTE 이미지의 경우에는 어떤 방식으로 처리할지 결정되면 진행
-                table_figure_outputs.append((crop_img, bbox, "Figure"))
+                new_bbox = expand_bbox_with_original(img, bbox, 10, 10)
+                table_figure_outputs.append({
+                    'obj': new_bbox,
+                    'bbox': bbox,
+                    'type': "Figure",
+                    'image': new_bbox
+                })
             else:  # 나머지 타입은 처리하지않는 유형이므로 무시
                 pass
 
@@ -159,24 +173,37 @@ class Pdf2Text(object):
             crop_img = img.crop(bbox)
 
             if layout_ele['caption'] is not None:
-                crop_img = add_edge_margin(crop_img, 20, 20)
+                expand_img = add_edge_margin(crop_img, 20, 20)
 
-                crop_img = np.array(crop_img)
+                crop_img = np.array(expand_img)
                 crop_img = cv2.cvtColor(crop_img, cv2.COLOR_RGB2BGR)
 
                 text_ocr_output = self.text_ocr.Recognize_Text(crop_img, lang)
-
-                caption_outputs.append(
-                    (text_ocr_output, bbox, layout_ele['caption']))
+                caption_outputs.append({
+                    'text': text_ocr_output,
+                    'bbox': bbox,
+                    'type': layout_ele['caption'],
+                    'image': expand_img
+                })
 
             elif ele_type == ElementType.TABLE:
                 new_bbox = expand_bbox_with_original(img, bbox, 10, 10)
                 crop_img = img.crop(new_bbox)
-                table_figure_outputs.append(
-                    (self.table_ocr.ocr(crop_img, lang), new_bbox, "Table"))
+                table_figure_outputs.append({
+                    'obj': self.table_ocr.ocr(crop_img, lang),
+                    'bbox': new_bbox,
+                    'type': "Table",
+                    'image': crop_img
+                })
 
             elif ele_type == ElementType.FIGURE:
-                table_figure_outputs.append((crop_img, bbox, "Figure"))
+                new_bbox = expand_bbox_with_original(img, bbox, 10, 10)
+                table_figure_outputs.append({
+                    'obj': new_bbox,
+                    'bbox': bbox,
+                    'type': "Figure",
+                    'image': new_bbox
+                })
             else:  # 나머지 타입은 처리하지않는 유형이므로 무시
                 pass
 

@@ -92,16 +92,26 @@ class FileManager:
             # figure 처리
             if 'figure' in match_res:
                 for figure in match_res['figure']:
-                    temp_path = f"temp_figure_{paper_id}_{figure['caption_number']}.png"
-                    figure['obj'].save(temp_path)
+                    path_dict = {
+                        "figure_path": f"temp_figure_{paper_id}_{figure['caption_number']}.png",
+                        "caption_path": f"temp_caption_{paper_id}_figure_{figure['caption_number']}.png",
+                    }
 
-                    storage_info = self.storage_manager.upload_figure(
-                        file_path=temp_path,
+                    figure['obj_image'].save(path_dict['figure_path'])
+                    figure['caption_image'].save(path_dict['caption_path'])
+
+                    figure_storage_info = self.storage_manager.upload_figure(
+                        file_path=path_dict['figure_path'],
+                        bucket_name=os.getenv('NCP_BUCKET_NAME')
+                    )
+
+                    caption_storage_info = self.storage_manager.upload_figure(
+                        file_path=path_dict['caption_path'],
                         bucket_name=os.getenv('NCP_BUCKET_NAME')
                     )
 
                     # DeepSeek 처리
-                    image = Image.open(temp_path)
+                    image = Image.open(path_dict['figure_path'])
                     caption = "This is Transformer Acheitecture img"
                     response = conversation_with_images("deepseek-ai/deepseek-vl-7b-chat",
                                                         [image],
@@ -109,15 +119,16 @@ class FileManager:
                                                         if figure['caption_text'] else caption)
                     trans_response = translate_clova(
                         response, completion_executor)
-                    
+
                     # 컬럼 추가
                     self.additional_manager.insert_figure_file(
                         user_id=user_id,
                         paper_id=paper_id,
-                        storage_path=storage_info['path'],
+                        storage_path=figure_storage_info['path'],
                         caption_number=figure['caption_number'],
                         caption_info=figure['caption_text'],
-                        description=trans_response
+                        description=trans_response,
+                        caption_path=caption_storage_info['path']
                     )
 
                     # embedding
@@ -130,17 +141,39 @@ class FileManager:
                         figure_doc["embedding"] = model.encode(
                             figure_doc["chunk"]).tolist()
                     chunked_documents.append(figure_doc)
-                    os.remove(temp_path)
+
+                    for path in path_dict:
+                        os.remove(path_dict[path])
 
             # table 처리
             if 'table' in match_res:
                 for table in match_res['table']:
+                    path_dict = {
+                        "table_path": f"temp_table_{paper_id}_{table['caption_number']}.png",
+                        "caption_path": f"temp_caption_{paper_id}_table_{table['caption_number']}.png",
+                    }
+
+                    table['obj_image'].save(path_dict['table_path'])
+                    table['caption_image'].save(path_dict['caption_path'])
+
+                    table_storage_info = self.storage_manager.upload_table(
+                        file_path=path_dict['table_path'],
+                        bucket_name=os.getenv('NCP_BUCKET_NAME')
+                    )
+
+                    caption_storage_info = self.storage_manager.upload_caption(
+                        file_path=path_dict['caption_path'],
+                        bucket_name=os.getenv('NCP_BUCKET_NAME')
+                    )
+
                     self.additional_manager.insert_table_file(
                         user_id=user_id,
                         paper_id=paper_id,
                         table_obj=table['obj'],
                         caption_number=table['caption_number'],
-                        description=table['caption_text']
+                        description=table['caption_text'],
+                        storage_path=table_storage_info['path'],
+                        caption_path=caption_storage_info['path']
                     )
 
                     table_doc = {
@@ -152,6 +185,9 @@ class FileManager:
                         table_doc["embedding"] = model.encode(
                             table_doc["chunk"]).tolist()
                     chunked_documents.append(table_doc)
+
+                    for path in path_dict:
+                        os.remove(path_dict[path])
 
             if chunked_documents:
                 self.document_manager.upload_documents(
@@ -258,7 +294,7 @@ class FileManager:
             return False
 
     # TODO Paper부터 다른 가져오는 기능 임시 파일 삭제하는거 만들기
-    def get_paper(self, user_id: str, paper_id: int) -> str:    
+    def get_paper(self, user_id: str, paper_id: int) -> str:
         """Storage에서 PDF 파일 가져오는 메서드"""
         try:
             paper_info = self.paper_manager.get_paper_info(user_id, paper_id)
@@ -316,27 +352,92 @@ class FileManager:
 
             figure_paths = []
             for figure in figure_info:
-                temp_path = f"temp_figure_{paper_id}_{figure['caption_number']}.png"
-                downloaded = self.storage_manager.download_file(
+                path_dict = {
+                    "figure_path": f"temp_figure_{paper_id}_{figure['caption_number']}.png",
+                    "caption_path": f"temp_caption_{paper_id}_figure_{figure['caption_number']}.png"
+                }
+
+                figure_downloaded = self.storage_manager.download_file(
                     file_url=figure['storage_path'],
-                    local_path=temp_path,
+                    local_path=path_dict['figure_path'],
                     bucket_name=os.getenv('NCP_BUCKET_NAME')
                 )
 
-                if not downloaded:
+                caption_downloaded = self.storage_manager.download_file(
+                    file_url=figure['caption_path'],
+                    local_path=path_dict['caption_path'],
+                    bucket_name=os.getenv('NCP_BUCKET_NAME')
+                )
+
+                if not figure_downloaded:
                     print(f"Figure {figure['caption_number']} 다운로드 실패")
                     continue
 
+                if not caption_downloaded:
+                    print(
+                        f"Figure {figure['caption_number']}번의 Caption 다운로드 실패")
+                    continue
+
                 figure_paths.append({
-                    'path': temp_path,
+                    'path': path_dict['figure_path'],
                     'figure_number': figure['caption_number'],
                     'caption_info': figure.get('caption_info', ''),
-                    'description': figure.get('description', '')
+                    'description': figure.get('description', ''),
+                    'caption_path': path_dict['caption_path']
                 })
 
             return figure_paths
         except Exception as e:
             print(f"Figure 가져오기 실패: {str(e)}")
+            return None
+
+    def get_table(self, user_id: str, paper_id: str):
+        """ Table 가져오기 """
+        try:
+            table_info = self.additional_manager.search_table_file(
+                user_id, paper_id)
+            if not table_info:
+                raise Exception("Table not found")
+
+            table_paths = []
+            for table in table_info:
+                path_dict = {
+                    "table_path": f"temp_table_{paper_id}_{table['caption_number']}.png",
+                    "caption_path": f"temp_caption_{paper_id}_table_{table['caption_number']}.png"
+                }
+
+                table_downloaded = self.storage_manager.download_file(
+                    file_url=table['storage_path'],
+                    local_path=path_dict['table_path'],
+                    bucket_name=os.getenv('NCP_BUCKET_NAME')
+                )
+
+                caption_downloaded = self.storage_manager.download_file(
+                    file_url=table['caption_path'],
+                    local_path=path_dict['caption_path'],
+                    bucket_name=os.getenv('NCP_BUCKET_NAME')
+                )
+
+                if not table_downloaded:
+                    print(f"Table {table['caption_number']} 다운로드 실패")
+                    continue
+
+                if not caption_downloaded:
+                    print(
+                        f"Table {table['caption_number']}번의 Caption 다운로드 실패")
+                    continue
+
+                table_paths.append({
+                    'path': path_dict['table_path'],
+                    'table_number': table['caption_number'],
+                    'caption_info': table.get('caption_info', ''),
+                    'description': table.get('description', ''),
+                    'caption_path': path_dict['caption_path']
+                })
+            return table_paths
+
+        except Exception as e:
+            print(f"Table 가져오기 실패: {str(e)}")
             return None
 
     def get_timeline(self, user_id: str, paper_id: str):
