@@ -8,6 +8,7 @@ from api.api_classes import ChatCompletionsExecutor
 from config.config import API_CONFIG
 import json
 
+
 def translate_to_english(korean_text):
     """
     한글 키워드를 영어로 번역하는 함수 (API 없이 작동).
@@ -20,6 +21,7 @@ def translate_to_english(korean_text):
     except Exception as e:
         print(f"⚠️ 번역 실패: {korean_text} → 원래 단어 유지 ({e})")
         return korean_text  # 번역 실패 시 원래 단어 유지
+
 
 def extract_keywords(text):
     """
@@ -36,8 +38,9 @@ def extract_keywords(text):
     ]
     return translated_keywords
 
+
 def timeline_str(query_list):
-    # API 엔드포인트 
+    # API 엔드포인트
     base_url = "https://api.semanticscholar.org/graph/v1/paper/search"
 
     output_str = ""
@@ -46,13 +49,14 @@ def timeline_str(query_list):
     for query in query_list:
         output_str += f"\n검색 키워드: {query}\n"
         url = f"{base_url}?query={query}&fields=title,year,citationCount&limit=10"
-        
+
         response = requests.get(url)
 
         if response.status_code == 200:
             data = response.json()
-            
-            sorted_papers = sorted(data.get("data", []), key=lambda x: x["citationCount"], reverse=True)[:3]
+
+            sorted_papers = sorted(
+                data.get("data", []), key=lambda x: x["citationCount"], reverse=True)[:3]
 
             for paper in sorted_papers:
                 short_title = paper["title"]
@@ -65,8 +69,10 @@ def timeline_str(query_list):
 
         # 속도 제한을 고려하여 1초 대기
         time.sleep(1)
-        
+
     return output_str
+
+
 
 
 def abstractive_timeline(user_input):
@@ -80,8 +86,8 @@ def abstractive_timeline(user_input):
         api_key=API_CONFIG["api_key"],
         request_id=API_CONFIG["request_id"],
     )
-    
-    system_prompt="""
+
+    system_prompt = """
             당신은 인공지능 및 머신러닝 논문 추천이자 시스템입니다.
             반드시 아래에 있는 준수하여 출력해주세요.
             그외의 출력은 잘못된 출력으로 처리합니다.

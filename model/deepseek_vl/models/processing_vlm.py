@@ -25,8 +25,8 @@ from PIL.Image import Image
 from transformers import LlamaTokenizerFast
 from transformers.processing_utils import ProcessorMixin
 
-from deepseek_vl.models.image_processing_vlm import VLMImageProcessor
-from deepseek_vl.utils.conversation import get_conv_template
+from model.deepseek_vl.models.image_processing_vlm import VLMImageProcessor
+from model.deepseek_vl.utils.conversation import get_conv_template
 
 
 class DictOutput(object):
@@ -216,7 +216,8 @@ class VLChatProcessor(ProcessorMixin):
 
             # add image tokens, and set the mask as False
             input_slices.append(
-                self.image_id * torch.ones((self.num_image_tokens,), dtype=torch.long)
+                self.image_id *
+                torch.ones((self.num_image_tokens,), dtype=torch.long)
             )
             start = index + 1
 
@@ -225,7 +226,8 @@ class VLChatProcessor(ProcessorMixin):
 
         # concat all slices
         input_ids = torch.cat(input_slices, dim=0)
-        num_image_tokens = torch.IntTensor([self.num_image_tokens] * len(image_indices))
+        num_image_tokens = torch.IntTensor(
+            [self.num_image_tokens] * len(image_indices))
 
         return input_ids, num_image_tokens
 
@@ -353,11 +355,13 @@ class VLChatProcessor(ProcessorMixin):
         batched_input_ids = torch.full(
             (batch_size, input_token_max_len), self.pad_id
         ).long()  # FIXME
-        batched_attention_mask = torch.zeros((batch_size, input_token_max_len)).long()
+        batched_attention_mask = torch.zeros(
+            (batch_size, input_token_max_len)).long()
         batched_pixel_values = torch.zeros(
             (batch_size, max_n_images, *self.image_processor.default_shape)
         ).float()
-        batched_images_seq_mask = torch.zeros((batch_size, input_token_max_len)).bool()
+        batched_images_seq_mask = torch.zeros(
+            (batch_size, input_token_max_len)).bool()
         batched_images_emb_mask = torch.zeros(
             (batch_size, max_n_images, self.num_image_tokens)
         ).bool()

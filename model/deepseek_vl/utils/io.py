@@ -26,11 +26,12 @@ import base64
 import io
 from transformers import AutoModelForCausalLM
 
-from deepseek_vl.models import MultiModalityCausalLM, VLChatProcessor
+from model.deepseek_vl.models import MultiModalityCausalLM, VLChatProcessor
 
 
 def load_pretrained_model(model_path: str):
-    vl_chat_processor: VLChatProcessor = VLChatProcessor.from_pretrained(model_path)
+    vl_chat_processor: VLChatProcessor = VLChatProcessor.from_pretrained(
+        model_path)
     tokenizer = vl_chat_processor.tokenizer
 
     vl_gpt: MultiModalityCausalLM = AutoModelForCausalLM.from_pretrained(

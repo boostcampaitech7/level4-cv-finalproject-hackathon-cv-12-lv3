@@ -189,7 +189,24 @@ class PaperManager(BaseDBHandler):
             }
         else:
             return None
+        
+    def get_summary_pdf_id(self, user_id: str):
+        query = """
+            SELECT DISTINCT
+                a.paper_id
+            FROM papers a
+            JOIN audio_info b
+            ON a.user_id = b.user_id
+            AND a.paper_id = b.paper_id
+            WHERE a.user_id = %s
+            AND a.long_summary is not null
+        """
+        result = self.execute_query(query, (user_id,))
 
+        if result:
+            paper_ids = [row[0] for row in result]
+            return paper_ids
+        return None
 
 class DocumentUploader:
     def __init__(self, connection):
@@ -500,16 +517,18 @@ class AdditionalFileUploader(BaseDBHandler):
         self.conn = connection
 
     def insert_figure_file(self, user_id, paper_id,
-                           storage_path, caption_number, description):
+                           storage_path, caption_number, 
+                           caption_info, description):
         query = """
             INSERT INTO public.figure_info
             (user_id, paper_id, storage_path, 
-            caption_number, description)
-            VALUES (%s, %s, %s, %s, %s)
+            caption_number, caption_info, description)
+            VALUES (%s, %s, %s, %s, %s, %s)
         """
 
         self.execute_query_one(query, (user_id, paper_id,
-                                       storage_path, caption_number, description))
+                                       storage_path, caption_number, 
+                                       caption_info, description))
 
     def insert_table_file(self, user_id, paper_id,
                           table_obj, caption_number, description):
@@ -559,7 +578,8 @@ class AdditionalFileUploader(BaseDBHandler):
     def search_figure_file(self, user_id, paper_id):
         query = """
             SELECT 
-                storage_path, caption_number, description
+                storage_path, caption_number,
+                caption_info, description
             FROM public.figure_info
             WHERE user_id = %s
             AND paper_id = %s
@@ -572,7 +592,8 @@ class AdditionalFileUploader(BaseDBHandler):
             result.append({
                 'storage_path': figure[0],
                 'caption_number': figure[1],
-                'description': figure[2]
+                'caption_info': figure[2],
+                'description': figure[3]
             })
 
         return result
@@ -607,9 +628,13 @@ class AdditionalFileUploader(BaseDBHandler):
             AND paper_id = %s
         """
 
-        tags = self.execute_query_one(query, (user_id, paper_id))
+        result = self.execute_query(query, (user_id, paper_id))
 
-        return tags
+        if result:
+            tags = [row[0] for row in result]
+            return tags
+
+        return None
 
     def search_timeline_file(self, user_id, paper_id):
         query = """
@@ -652,3 +677,31 @@ class AdditionalFileUploader(BaseDBHandler):
             return result
         else:
             return None
+
+    def search_users_hist(self, user_id):
+        query = """
+            SELECT DISTINCT
+                b.title,
+                b.paper_id,
+                MAX(a.created_at) as last_chat
+            FROM public.chat_hist a
+            JOIN public.papers b 
+                ON a.user_id = b.user_id
+                AND a.paper_id = b.paper_id
+            WHERE a.user_id = %s
+            GROUP BY b.title, b.paper_id
+            ORDER BY last_chat DESC
+        """
+
+        hist = self.execute_query(query, (user_id,))
+
+        if hist:
+            result = []
+            for row in hist:
+                result.append({
+                    'title': row[0],
+                    'paper_id': row[1],
+                    'last_chat': row[2]
+                })
+            return result
+        return []

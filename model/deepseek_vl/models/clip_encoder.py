@@ -24,8 +24,8 @@ import torch.nn as nn
 import torchvision.transforms
 from einops import rearrange
 
-from deepseek_vl.models.sam import create_sam_vit
-from deepseek_vl.models.siglip_vit import create_siglip_vit
+from model.deepseek_vl.models.sam import create_sam_vit
+from model.deepseek_vl.models.siglip_vit import create_siglip_vit
 
 
 class CLIPVisionTower(nn.Module):
@@ -81,7 +81,8 @@ class CLIPVisionTower(nn.Module):
         else:  # huggingface
             from transformers import CLIPVisionModel
 
-            vision_tower = CLIPVisionModel.from_pretrained(**vision_tower_params)
+            vision_tower = CLIPVisionModel.from_pretrained(
+                **vision_tower_params)
             forward_kwargs = dict(output_hidden_states=True)
 
         return vision_tower, forward_kwargs
@@ -102,7 +103,8 @@ class CLIPVisionTower(nn.Module):
             image_features = image_features
 
         else:
-            raise ValueError(f"Unexpected select feature: {self.select_feature}")
+            raise ValueError(
+                f"Unexpected select feature: {self.select_feature}")
         return image_features
 
     def forward(self, images):
@@ -140,7 +142,8 @@ class HybridVisionTower(nn.Module):
         self.low_res_size = low_res_cfg["image_size"]
         self.concat_type = concat_type
 
-        self.high_layer_norm = nn.LayerNorm(high_res_cfg.get("output_dim", 1024))
+        self.high_layer_norm = nn.LayerNorm(
+            high_res_cfg.get("output_dim", 1024))
         self.low_layer_norm = nn.LayerNorm(low_res_cfg.get("output_dim", 1024))
 
         if freeze_high:
@@ -160,7 +163,8 @@ class HybridVisionTower(nn.Module):
                 p.requires_grad = False
             self.vision_tower_low = self.vision_tower_low.eval()
 
-        self.resize = torchvision.transforms.Resize(self.low_res_size, antialias=True)
+        self.resize = torchvision.transforms.Resize(
+            self.low_res_size, antialias=True)
 
     def forward(self, images: torch.Tensor):
         """

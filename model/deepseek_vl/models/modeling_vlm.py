@@ -29,8 +29,8 @@ from transformers import (
 )
 from transformers.configuration_utils import PretrainedConfig
 
-from deepseek_vl.models.clip_encoder import CLIPVisionTower, HybridVisionTower
-from deepseek_vl.models.projector import MlpProjector
+from model.deepseek_vl.models.clip_encoder import CLIPVisionTower, HybridVisionTower
+from model.deepseek_vl.models.projector import MlpProjector
 
 
 def model_name_to_cls(cls_name):
@@ -150,7 +150,8 @@ class MultiModalityCausalLM(MultiModalityPreTrainedModel):
         images_embeds = self.aligner(self.vision_model(images))
 
         # [b x n, T2, D] -> [b, n x T2, D]
-        images_embeds = rearrange(images_embeds, "(b n) t d -> b (n t) d", b=bs, n=n)
+        images_embeds = rearrange(
+            images_embeds, "(b n) t d -> b (n t) d", b=bs, n=n)
         # [b, n, T2] -> [b, n x T2]
         images_emb_mask = rearrange(images_emb_mask, "b n t -> b (n t)")
 
