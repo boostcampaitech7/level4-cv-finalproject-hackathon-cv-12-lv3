@@ -141,16 +141,28 @@ class FileManager:
                         figure_doc["embedding"] = model.encode(
                             figure_doc["chunk"]).tolist()
                     chunked_documents.append(figure_doc)
-                    os.remove(temp_path)
+
+                    for path in path_dict:
+                        os.remove(path_dict[path])
 
             # table 처리
             if 'table' in match_res:
                 for table in match_res['table']:
-                    temp_path = f"temp_table_{paper_id}_{table['caption_number']}.png"
-                    figure['obj_image'].save(temp_path, "png")
+                    path_dict = {
+                        "table_path": f"temp_table_{paper_id}_{table['caption_number']}.png",
+                        "caption_path": f"temp_caption_{paper_id}_table_{table['caption_number']}.png",
+                    }
+
+                    table['obj_image'].save(path_dict['table_path'])
+                    table['caption_image'].save(path_dict['caption_path'])
 
                     table_storage_info = self.storage_manager.upload_table(
-                        file_path=temp_path,
+                        file_path=path_dict['table_path'],
+                        bucket_name=os.getenv('NCP_BUCKET_NAME')
+                    )
+
+                    caption_storage_info = self.storage_manager.upload_caption(
+                        file_path=path_dict['caption_path'],
                         bucket_name=os.getenv('NCP_BUCKET_NAME')
                     )
 
@@ -159,7 +171,9 @@ class FileManager:
                         paper_id=paper_id,
                         table_obj=table['obj'],
                         caption_number=table['caption_number'],
-                        description=table['caption_text']
+                        description=table['caption_text'],
+                        storage_path=table_storage_info['path'],
+                        caption_path=caption_storage_info['path']
                     )
 
                     table_doc = {
@@ -171,6 +185,9 @@ class FileManager:
                         table_doc["embedding"] = model.encode(
                             table_doc["chunk"]).tolist()
                     chunked_documents.append(table_doc)
+
+                    for path in path_dict:
+                        os.remove(path_dict[path])
 
             if chunked_documents:
                 self.document_manager.upload_documents(

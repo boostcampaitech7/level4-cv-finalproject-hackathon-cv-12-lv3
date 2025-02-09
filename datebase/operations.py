@@ -532,16 +532,19 @@ class AdditionalFileUploader(BaseDBHandler):
                                        caption_info, description, caption_path))
 
     def insert_table_file(self, user_id, paper_id,
-                          table_obj, caption_number, description):
+                          table_obj, caption_number, description,
+                          storage_path, caption_path):
         query = """
             INSERT INTO public.table_info
             (user_id, paper_id, table_obj,
-            caption_number, description)
-            VALUES (%s, %s, %s, %s, %s)
+            caption_number, description,
+            storage_path, caption_path)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
         """
 
         self.execute_query_one(query, (user_id, paper_id,
-                                       table_obj, caption_number, description))
+                                       table_obj, caption_number, description,
+                                       storage_path, caption_path))
 
     def insert_tag_file(self, user_id, paper_id,
                         tag_text):
