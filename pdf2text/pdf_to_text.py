@@ -89,11 +89,12 @@ class Pdf2Text(object):
 
             elif ele_type == ElementType.FIGURE:
                 # NOTE 이미지의 경우에는 어떤 방식으로 처리할지 결정되면 진행
+                new_bbox = expand_bbox_with_original(img, bbox, 10, 10)
                 table_figure_outputs.append({
-                    'obj': crop_img,
+                    'obj': new_bbox,
                     'bbox': bbox,
                     'type': "Figure",
-                    'image': crop_img
+                    'image': new_bbox
                 })
             else:  # 나머지 타입은 처리하지않는 유형이므로 무시
                 pass
@@ -172,9 +173,9 @@ class Pdf2Text(object):
             crop_img = img.crop(bbox)
 
             if layout_ele['caption'] is not None:
-                crop_img = add_edge_margin(crop_img, 20, 20)
+                expand_img = add_edge_margin(crop_img, 20, 20)
 
-                crop_img = np.array(crop_img)
+                crop_img = np.array(expand_img)
                 crop_img = cv2.cvtColor(crop_img, cv2.COLOR_RGB2BGR)
 
                 text_ocr_output = self.text_ocr.Recognize_Text(crop_img, lang)
@@ -182,7 +183,7 @@ class Pdf2Text(object):
                     'text': text_ocr_output,
                     'bbox': bbox,
                     'type': layout_ele['caption'],
-                    'image': crop_img
+                    'image': expand_img
                 })
 
             elif ele_type == ElementType.TABLE:
@@ -196,11 +197,12 @@ class Pdf2Text(object):
                 })
 
             elif ele_type == ElementType.FIGURE:
+                new_bbox = expand_bbox_with_original(img, bbox, 10, 10)
                 table_figure_outputs.append({
-                    'obj': crop_img,
+                    'obj': new_bbox,
                     'bbox': bbox,
                     'type': "Figure",
-                    'image': None
+                    'image': new_bbox
                 })
             else:  # 나머지 타입은 처리하지않는 유형이므로 무시
                 pass

@@ -801,8 +801,8 @@ def matching_captioning(captions: List[Dict[str, Union[str, List[int], Image.Ima
     matched_result = {'figure': [], 'table': []}
     unmatched_result = {'obj': [], 'caption': []}
 
-    captions.sort(key=lambda x: (x[1][1], x[1][0]))
-    objects.sort(key=lambda x: (x[1][1], x[1][0]))
+    captions.sort(key=lambda x: (x['bbox'][1], x['bbox'][0]))
+    objects.sort(key=lambda x: (x['bbox'][1], x['bbox'][0]))
 
     for caption in captions:
         caption_number = extract_caption_number(caption['text'])
