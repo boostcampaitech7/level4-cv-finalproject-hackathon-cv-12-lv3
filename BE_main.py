@@ -16,7 +16,9 @@ from enum import Enum
 from pydantic import BaseModel
 from fastapi import FastAPI, UploadFile, status, Depends, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+
+from requests import Response
 
 from config.config import AI_CONFIG, API_CONFIG
 from pdf2text import Pdf2Text, pdf_to_image
@@ -226,9 +228,10 @@ async def chat_message(req: ChatRequest,
                        conn=Depends(get_db_connection),
                        paper_manager: PaperManager = Depends(get_paper_manager)):
     pdf_id, user_id, user_input = req.pdf_id, req.user_id, req.message
-    
+
     fig_table_keywords = ['figure', '피규어', 'table', '테이블']
-    is_figure_query = any(keyword in user_input.lower() for keyword in fig_table_keywords)
+    is_figure_query = any(keyword in user_input.lower()
+                          for keyword in fig_table_keywords)
 
     multi_chat_manager.initialize_chat("")
 
@@ -237,7 +240,7 @@ async def chat_message(req: ChatRequest,
         "jinaai/jina-reranker-v2-base-multilingual", trust_remote_code=True)
 
     # paper_info = paper_manager.get_paper_info(user_id, pdf_id)
-    
+
     if is_figure_query:
         relevant_response = query_and_respond(
             query=user_input,
@@ -298,32 +301,26 @@ async def chat_message(req: ChatRequest,
             user_input,
             context
         )
-    try:
-        response = completion_executor.execute(
-            request_data, stream=True
-        )
 
-        if response:
-            multi_chat_manager.process_response(response)
-            current_embedding = embedding_api.get_embedding(user_input)
+    def response_generator():
+        from http import HTTPStatus
+        try:
+            final_content = None
+            with completion_executor.execute(request_data, stream=True, return_type="Response") as r:
+                if r.status_code != HTTPStatus.OK:
+                    raise ValueError(
+                        f"오류 발생[1]: HTTP {r.status_code}, 메시지: {r.text}")
 
-            chat_history_manager.store_conversation(
-                user_id=user_id,
-                paper_id=pdf_id,
-                user_message=user_input,
-                llm_response=response['content'],
-                embedding=current_embedding,
-                chat_type=context['type']
-            )
+                final_content = yield from handle_response(r)
 
-            chat_history_manager.add_to_cache(
-                user_id, pdf_id, user_input, context, response['content']
-            )
-            return {"success": True, "data": {"message": response['content']}}
+            if final_content:
+                chat_post_processing(
+                    user_id, pdf_id, final_content, user_input, context)
+        except Exception as e:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                detail=f"답변 생성 중 오류 발생 : {str(e)}")
 
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail=f"답변 생성 중 오류 발생 : {str(e)}")
+    return StreamingResponse(response_generator(), media_type="text/event-stream")
 
 
 @app.post("/table-figure", response_model=BaseResponse, response_model_exclude_unset=True)
@@ -379,7 +376,7 @@ async def summarize_and_get_files(req: PdfRequest,
     paper_summarizer = PaperSummarizer()
 
     paper_file = file_manager.get_paper(user_id, pdf_id)
-    
+
     final_summary = paper_summarizer.generate_summary(paper_file)
 
     file_flag = file_manager.extract_summary_content(
@@ -758,3 +755,51 @@ def run_translate(file_name):
         'translated_pdfs': mono_pdf_path,
         'translated_json': json_data
     }
+
+
+def handle_response(response: Response):
+    final_content = None
+    for line in response.iter_lines():
+        if not line:
+            continue
+
+        decoded_line = line.decode("utf-8")
+        if not decoded_line.startswith("data:"):
+            continue
+
+        try:
+            data = json.loads(
+                decoded_line.replace("data:", "").strip())
+            if "message" in data:
+                final_content = {
+                    "content": data['message']['content'],
+                    "context": data['message']['content'],
+                    'inputLength': data['inputLength'],
+                    'outputLength': data['outputLength']
+                }
+                yield json.dumps({"success": True, "data": {"message": f"{data['message']['content']}"}}, ensure_ascii=False)
+        except json.JSONDecodeError as e:
+            continue
+    return final_content
+
+
+def chat_post_processing(user_id, paper_id, response, user_input, context):
+    if response is None:
+        return
+
+    multi_chat_manager.process_response(response)
+
+    current_embedding = embedding_api.get_embedding(user_input)
+
+    chat_history_manager.store_conversation(
+        user_id=user_id,
+        paper_id=paper_id,
+        user_message=user_input,
+        llm_response=response['content'],
+        embedding=current_embedding,
+        chat_type=context['type']
+    )
+
+    chat_history_manager.add_to_cache(
+        user_id, paper_id, user_input, context, response['content']
+    )
