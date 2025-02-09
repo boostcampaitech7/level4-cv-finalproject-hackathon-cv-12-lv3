@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.join(current_dir, ".."))
 GCP_API_KEY = os.getenv("GCP_API_KEY")
 
 # 서비스 계정 키 환경 변수 설정
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "your_json_path"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/data/ephemeral/home/google.json"
 
 
 def synthesize_text(text, voice_type="speaker1"):

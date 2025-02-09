@@ -3,12 +3,15 @@ import os
 import json
 import torch
 import subprocess
+import logging
 
+from typing import List
 from typing import Dict, Any, Optional
 from collections import defaultdict
 from functools import lru_cache
 from base64 import b64encode
 from hashlib import sha256
+from enum import Enum
 
 from pydantic import BaseModel
 from fastapi import FastAPI, UploadFile, status, Depends, HTTPException, Form
@@ -29,6 +32,7 @@ from datebase.operations import PaperManager, DocumentUploader, ChatHistoryManag
 from sentence_transformers import SentenceTransformer, CrossEncoder
 from summarizer import Summarizer
 
+logger = logging.getLogger(__name__)
 
 @lru_cache()
 def get_db_connection():
@@ -89,6 +93,9 @@ app.add_middleware(
     allow_headers=["*"],  # 모든 헤더 허용
 )
 
+class InfoType(str, Enum):
+    all = "all"
+    head = "head"
 
 class BaseRequest(BaseModel):
     pdf_id: int
@@ -110,6 +117,18 @@ class PdfRequest(BaseRequest):
     ):
         return cls(user_id=user_id, pdf_id=pdf_id)
 
+class MultiPdfRequest(BaseModel):
+    pdf_ids: List[int]
+    user_id: str = "admin"
+
+    @classmethod
+    def as_form(
+        cls,
+        user_id: str = Form('admin'),
+        pdf_ids: str = Form(...)
+    ):
+        pdf_id_list = [int(id_) for id_ in pdf_ids.split(',')]
+        return cls(user_id=user_id, pdf_ids=pdf_id_list)
 
 class ChatRequest(BaseRequest):
     message: str = ""
@@ -403,7 +422,8 @@ async def get_figure(req: PdfRequest,
                 figures_data.append({
                     'image': img_data,
                     'figure_number': fig['figure_number'],
-                    'caption': fig['caption']
+                    'caption_info': fig['caption_info'],
+                    'description': fig['description']
                 })
             os.remove(fig['path'])
 
@@ -472,7 +492,7 @@ async def get_table(req: PdfRequest,
 @app.post("/pdf/get_users_hist")
 async def get_users_hist(req: PdfRequest,
                          additional_uploader: AdditionalFileUploader = Depends(get_add_file_uploader)):
-    user_id = req.user_id
+    user_id, pdf_id = req.user_id, req.pdf_id
     hist_info = additional_uploader.search_users_hist(user_id)
 
     if hist_info:
@@ -519,7 +539,7 @@ async def get_tags(req: PdfRequest,
 @app.post("/pdf/get_summary_pdf_id")
 async def get_summary_pdf_id(req: PdfRequest,
                             paper_manager: PaperManager = Depends(get_paper_manager)):
-    user_id= req.user_id
+    user_id, pdf_id = req.user_id, req.pdf_id
     summary_pdf_id = paper_manager.get_summary_pdf_id(user_id)
 
     if summary_pdf_id:
@@ -529,74 +549,95 @@ async def get_summary_pdf_id(req: PdfRequest,
         }
     return {"success": False, "message": "요약된 PDF ID를 찾을 수 없습니다."}
 
-@app.post("/pdf/get_all_summary_info")
-async def get_all_summary_info(req: PdfRequest,
+@app.post("/pdf/get_all_summary_info/{info_type}")
+async def get_all_summary_info(info_type: InfoType,
+                               req: MultiPdfRequest,
                                paper_manager: PaperManager = Depends(get_paper_manager),
                                file_manager: FileManager = Depends(get_file_manager),
                                additional_uploader: AdditionalFileUploader = Depends(get_add_file_uploader)):
-    user_id, pdf_id = req.user_id, req.pdf_id
+    user_id = req.user_id
+    all_pdf_data = []
+    temp_files = []
 
     try:
-        # 1. Paper 기본 정보 가져오기
-        paper_info = paper_manager.get_paper_info(user_id, pdf_id)
-        if not paper_info:
-            return {"success": False, "message": "Paper 정보를 찾을 수 없습니다[1]"}
+        for pdf_id in req.pdf_ids:
+            response_data = {"json_data": {}, "files": {}}
+
+            # 1. Paper 기본 정보 가져오기
+            paper_info = paper_manager.get_paper_info(user_id, pdf_id)
+            if not paper_info:
+                return {"success": False, "message": "Paper 정보를 찾을 수 없습니다[1]"}
+            response_data["json_data"].update({
+                "paper_info": {
+                    "paper_id": paper_info['paper_id'],
+                    "title": paper_info['title'],
+                    "long_summary": paper_info['long_summary']
+                },
+                # 2. 태그 정보 가져오기
+                "tags": additional_uploader.search_tag_text(user_id, pdf_id)
+            })
+
+            # 3. 썸네일 가져오기
+            thumbnail_path = file_manager.get_thumbnail(user_id, pdf_id)
+            if thumbnail_path:
+                temp_files.append(thumbnail_path)
+                with open(thumbnail_path, 'rb') as f:
+                    response_data["files"]["thumbnail"] = b64encode(f.read()).decode('utf-8')
+                os.remove(thumbnail_path)
+
+            # 상세 보기 페이지를 들어가는 경우 (all)
+            if info_type == 'all':
+                # 4. Figure 정보 가져오기
+                fig_paths = file_manager.get_figure(user_id, pdf_id)
+                figures_data = []
+                if fig_paths:
+                    for fig in fig_paths:
+                        with open(fig['path'], 'rb') as img_file:
+                            img_data = b64encode(img_file.read()).decode('utf-8')
+                            figures_data.append({
+                                'image': img_data,
+                                'figure_number': fig['figure_number'],
+                                'caption_info': fig['caption_info'],
+                                'description': fig['description']
+                            })
+                        os.remove(fig['path'])
+                    response_data["json_data"]["figures"] = figures_data
+
+                # 5. 타임라인 정보 가져오기
+                timeline_path = None
+                timeline_path = file_manager.get_timeline(user_id, pdf_id)
+
+                if timeline_path:
+                    temp_files.append(timeline_path)
+                    with open(timeline_path, 'rb') as f:
+                        response_data["files"]["timeline"] = f.read().decode('utf-8')
+                    os.remove(timeline_path)
+
+                # 6. Table 정보 가져오기
+                table_info = additional_uploader.search_table_file(user_id, pdf_id)
+                response_data["json_data"]["tables"] = table_info
+
+            all_pdf_data.append(response_data)
         
-        # 2. 태그 정보 가져오기
-        tag_info = additional_uploader.search_tag_text(user_id, pdf_id)
+        for temp_file in temp_files:
+            try:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+            except Exception as e:
+                logger.error(f"임시 파일 삭제 실패: {str(e)}")
 
-        # 3. Figure 정보 가져오기
-        fig_paths = file_manager.get_figure(user_id, pdf_id)
-        figures_data = []
-        if fig_paths:
-            for fig in fig_paths:
-                with open(fig['path'], 'rb') as img_file:
-                    img_data = b64encode(img_file.read()).decode('utf-8')
-                    figures_data.append({
-                        'image': img_data,
-                        'figure_number': fig['figure_number'],
-                        'caption': fig['caption']
-                    })
-                os.remove(fig['path'])
-            
-        # 4. 타임라인 정보 가져오기
-        timeline_path = file_manager.get_timeline(user_id, pdf_id)
-        # 5. Audio 정보 확인
-        audio_path = file_manager.get_audio(user_id, pdf_id)
-
-        files_data = {}
-        if timeline_path:
-            with open(timeline_path, 'rb') as f:
-                files_data['timeline'] = f.read()
-
-        if audio_path:
-            with open(audio_path, 'rb') as f:
-                files_data['audio'] = f.read()
-
-        # 6. Table 정보 가져오기
-        table_info = additional_uploader.search_table_file(user_id, pdf_id)
-
-        json_data = {
-            "paper_info": {
-                "title": paper_info['title'],
-                "long_summary": paper_info['long_summary'],
-                "author": paper_info['author'],
-                "uploaded_at": paper_info['uploaded_at']
-            },
-            "tags": tag_info,
-            "figures": figures_data,
-            "tables": table_info
-        }
-
-        return Response(
-            content=json.dumps({
-                "json_data": json_data,
-                "files": files_data
-            }),
-            media_type="application/json"
-        )
+        return JSONResponse({"status": "success", "content": all_pdf_data})
+    except FileNotFoundError as e:
+        return JSONResponse({
+            "status": "error",
+            "content": f"파일을 찾을 수 없습니다: {str(e)}"
+        })
     except Exception as e:
-        return {"success": False, "message": f"정보 조회 중 오류가 발생했습니다: {str(e)}"}
+        logger.error(f"Unexpected error: {str(e)}")
+        return JSONResponse({
+            "status": "error",
+            "content": f"정보 조회 중 오류가 발생했습니다: {str(e)}"
+        })
 
 
 def pdf2text_recognize(pdf, key="text"):

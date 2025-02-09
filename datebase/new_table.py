@@ -63,7 +63,7 @@ try:
                 thumbnail_path TEXT NULL,
                 audio_title VARCHAR(255) NULL,
                 script TEXT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP  
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
     conn.commit()
@@ -76,7 +76,9 @@ try:
                 user_id VARCHAR(36) REFERENCES public.user_info(user_id),
                 storage_path TEXT NULL,
                 caption_number VARCHAR(50) NOT NULL,
-                description TEXT NULL    
+                caption_info TEXT NULL,
+                description TEXT NULL,
+                caption_path TEXT NULL
             )
         """)
     conn.commit()
@@ -89,7 +91,9 @@ try:
                 user_id VARCHAR(36) REFERENCES public.user_info(user_id),
                 table_obj TEXT NULL,
                 caption_number VARCHAR(255) NULL,
-                description TEXT NULL
+                description TEXT NULL,
+                storage_path TEXT NULL,
+                caption_path TEXT NULL
             )
         """)
     conn.commit()

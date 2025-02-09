@@ -517,16 +517,18 @@ class AdditionalFileUploader(BaseDBHandler):
         self.conn = connection
 
     def insert_figure_file(self, user_id, paper_id,
-                           storage_path, caption_number, description):
+                           storage_path, caption_number, 
+                           caption_info, description):
         query = """
             INSERT INTO public.figure_info
             (user_id, paper_id, storage_path, 
-            caption_number, description)
-            VALUES (%s, %s, %s, %s, %s)
+            caption_number, caption_info, description)
+            VALUES (%s, %s, %s, %s, %s, %s)
         """
 
         self.execute_query_one(query, (user_id, paper_id,
-                                       storage_path, caption_number, description))
+                                       storage_path, caption_number, 
+                                       caption_info, description))
 
     def insert_table_file(self, user_id, paper_id,
                           table_obj, caption_number, description):
@@ -576,7 +578,8 @@ class AdditionalFileUploader(BaseDBHandler):
     def search_figure_file(self, user_id, paper_id):
         query = """
             SELECT 
-                storage_path, caption_number, description
+                storage_path, caption_number,
+                caption_info, description
             FROM public.figure_info
             WHERE user_id = %s
             AND paper_id = %s
@@ -589,7 +592,8 @@ class AdditionalFileUploader(BaseDBHandler):
             result.append({
                 'storage_path': figure[0],
                 'caption_number': figure[1],
-                'description': figure[2]
+                'caption_info': figure[2],
+                'description': figure[3]
             })
 
         return result
