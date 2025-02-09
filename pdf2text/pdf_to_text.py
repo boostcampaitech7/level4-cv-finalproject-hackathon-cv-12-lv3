@@ -93,7 +93,7 @@ class Pdf2Text(object):
                     'obj': crop_img,
                     'bbox': bbox,
                     'type': "Figure",
-                    'image': None
+                    'image': crop_img
                 })
             else:  # 나머지 타입은 처리하지않는 유형이므로 무시
                 pass

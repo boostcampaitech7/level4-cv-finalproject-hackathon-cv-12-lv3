@@ -92,16 +92,26 @@ class FileManager:
             # figure 처리
             if 'figure' in match_res:
                 for figure in match_res['figure']:
-                    temp_path = f"temp_figure_{paper_id}_{figure['caption_number']}.png"
-                    figure['obj'].save(temp_path)
+                    path_dict = {
+                        "figure_path": f"temp_figure_{paper_id}_{figure['caption_number']}.png",
+                        "caption_path": f"temp_caption_{paper_id}_figure_{figure['caption_number']}.png",
+                    }
 
-                    storage_info = self.storage_manager.upload_figure(
-                        file_path=temp_path,
+                    figure['obj_image'].save(path_dict['figure_path'])
+                    figure['caption_image'].save(path_dict['caption_path'])
+
+                    figure_storage_info = self.storage_manager.upload_figure(
+                        file_path=path_dict['figure_path'],
+                        bucket_name=os.getenv('NCP_BUCKET_NAME')
+                    )
+
+                    caption_storage_info = self.storage_manager.upload_figure(
+                        file_path=path_dict['caption_path'],
                         bucket_name=os.getenv('NCP_BUCKET_NAME')
                     )
 
                     # DeepSeek 처리
-                    image = Image.open(temp_path)
+                    image = Image.open(path_dict['figure_path'])
                     caption = "This is Transformer Acheitecture img"
                     response = conversation_with_images("deepseek-ai/deepseek-vl-7b-chat",
                                                         [image],
@@ -109,15 +119,16 @@ class FileManager:
                                                         if figure['caption_text'] else caption)
                     trans_response = translate_clova(
                         response, completion_executor)
-                    
+
                     # 컬럼 추가
                     self.additional_manager.insert_figure_file(
                         user_id=user_id,
                         paper_id=paper_id,
-                        storage_path=storage_info['path'],
+                        storage_path=figure_storage_info['path'],
                         caption_number=figure['caption_number'],
                         caption_info=figure['caption_text'],
-                        description=trans_response
+                        description=trans_response,
+                        caption_path=caption_storage_info['path']
                     )
 
                     # embedding
@@ -135,6 +146,14 @@ class FileManager:
             # table 처리
             if 'table' in match_res:
                 for table in match_res['table']:
+                    temp_path = f"temp_table_{paper_id}_{table['caption_number']}.png"
+                    figure['obj_image'].save(temp_path, "png")
+
+                    table_storage_info = self.storage_manager.upload_table(
+                        file_path=temp_path,
+                        bucket_name=os.getenv('NCP_BUCKET_NAME')
+                    )
+
                     self.additional_manager.insert_table_file(
                         user_id=user_id,
                         paper_id=paper_id,
@@ -258,7 +277,7 @@ class FileManager:
             return False
 
     # TODO Paper부터 다른 가져오는 기능 임시 파일 삭제하는거 만들기
-    def get_paper(self, user_id: str, paper_id: int) -> str:    
+    def get_paper(self, user_id: str, paper_id: int) -> str:
         """Storage에서 PDF 파일 가져오는 메서드"""
         try:
             paper_info = self.paper_manager.get_paper_info(user_id, paper_id)

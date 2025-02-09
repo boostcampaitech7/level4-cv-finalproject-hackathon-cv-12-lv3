@@ -189,7 +189,7 @@ class PaperManager(BaseDBHandler):
             }
         else:
             return None
-        
+
     def get_summary_pdf_id(self, user_id: str):
         query = """
             SELECT DISTINCT
@@ -207,6 +207,7 @@ class PaperManager(BaseDBHandler):
             paper_ids = [row[0] for row in result]
             return paper_ids
         return None
+
 
 class DocumentUploader:
     def __init__(self, connection):
@@ -517,18 +518,18 @@ class AdditionalFileUploader(BaseDBHandler):
         self.conn = connection
 
     def insert_figure_file(self, user_id, paper_id,
-                           storage_path, caption_number, 
-                           caption_info, description):
+                           storage_path, caption_number,
+                           caption_info, description, caption_path):
         query = """
             INSERT INTO public.figure_info
             (user_id, paper_id, storage_path, 
-            caption_number, caption_info, description)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            caption_number, caption_info, description, caption_path)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
         """
 
         self.execute_query_one(query, (user_id, paper_id,
-                                       storage_path, caption_number, 
-                                       caption_info, description))
+                                       storage_path, caption_number,
+                                       caption_info, description, caption_path))
 
     def insert_table_file(self, user_id, paper_id,
                           table_obj, caption_number, description):

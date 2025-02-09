@@ -782,14 +782,14 @@ def expand_bbox_with_original(image: Image.Image, bbox: List[int], horizontal_ma
 
 
 def matching_captioning(captions: List[Dict[str, Union[str, List[int], Image.Image]]],
-                        objects: List[Dict[str, Union[str, List[int], Image.Image, None]]]):
+                        objects: List[Dict[str, Union[str, List[int], Image.Image]]]):
     """
     캡션과 객체의 위치를 기반으로 캡션과 객체를 매칭하는 함수.
 
     Args:
         captions (List[Dict[str, Union[str, List[int], Image.Image]]]): 캡션과 그에 해당하는 bounding box, 타입을 포함한 리스트.
             각 요소의 key값은 text, bbox, type, image 입니다.
-        objects (List[Dict[str, Union[str, List[int], Image.Image, None]]]): 객체와 그에 해당하는 bounding box, 타입을 포함한 리스트.
+        objects (List[Dict[str, Union[str, List[int], Image.Image]]]): 객체와 그에 해당하는 bounding box, 타입을 포함한 리스트.
             각 항목은 key값은 obj, bbox, type, image 형식입니다.
 
     Returns:
