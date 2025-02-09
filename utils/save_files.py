@@ -13,7 +13,7 @@ import json
 import random
 import tempfile
 from PIL import Image
-
+import traceback
 load_dotenv()
 
 # TODO 이거 임시 파일 만들고 삭제하는 로직은 나중에 추가하기
@@ -100,14 +100,6 @@ class FileManager:
                         bucket_name=os.getenv('NCP_BUCKET_NAME')
                     )
 
-                    self.additional_manager.insert_figure_file(
-                        user_id=user_id,
-                        paper_id=paper_id,
-                        storage_path=storage_info['path'],
-                        caption_number=figure['caption_number'],
-                        description=figure['caption_text']
-                    )
-
                     # DeepSeek 처리
                     image = Image.open(temp_path)
                     caption = "This is Transformer Acheitecture img"
@@ -117,17 +109,27 @@ class FileManager:
                                                         if figure['caption_text'] else caption)
                     trans_response = translate_clova(
                         response, completion_executor)
+                    
+                    # 컬럼 추가
+                    self.additional_manager.insert_figure_file(
+                        user_id=user_id,
+                        paper_id=paper_id,
+                        storage_path=storage_info['path'],
+                        caption_number=figure['caption_number'],
+                        caption_info=figure['caption_text'],
+                        description=trans_response
+                    )
 
                     # embedding
-                    table_doc = {
+                    figure_doc = {
                         "page": figure['caption_number'],
-                        "chunk": trans_response,
+                        "chunk": figure['caption_text'],
                         "type": "table"
                     }
-                    if table_doc["chunk"] and isinstance(table_doc["chunk"], str):
-                        table_doc["embedding"] = model.encode(
-                            table_doc["chunk"]).tolist()
-                    chunked_documents.append(table_doc)
+                    if figure_doc["chunk"] and isinstance(figure_doc["chunk"], str):
+                        figure_doc["embedding"] = model.encode(
+                            figure_doc["chunk"]).tolist()
+                    chunked_documents.append(figure_doc)
                     os.remove(temp_path)
 
             # table 처리
@@ -186,8 +188,8 @@ class FileManager:
                 )
 
             # 3. 타임라인 저장
-            timeline_data = timeline_str(query_list)
-            timeline_data = abstractive_timeline(timeline_data)
+            # timeline_data = timeline_str(query_list)
+            timeline_data = abstractive_timeline(query_list)
             temp_timeline_path = f"temp_timeline_{paper_id}.json"
             with open(temp_timeline_path, 'w', encoding='utf-8') as f:
                 json.dump(timeline_data, f, ensure_ascii=False, indent=4)
@@ -252,10 +254,11 @@ class FileManager:
             return True
         except Exception as e:
             print(f"콘텐츠 처리 및 저장 중 에러 발생: {str(e)}")
+            print("Traceback:", traceback.format_exc())
             return False
 
     # TODO Paper부터 다른 가져오는 기능 임시 파일 삭제하는거 만들기
-    def get_paper(self, user_id: str, paper_id: int) -> str:
+    def get_paper(self, user_id: str, paper_id: int) -> str:    
         """Storage에서 PDF 파일 가져오는 메서드"""
         try:
             paper_info = self.paper_manager.get_paper_info(user_id, paper_id)
@@ -327,7 +330,8 @@ class FileManager:
                 figure_paths.append({
                     'path': temp_path,
                     'figure_number': figure['caption_number'],
-                    'caption': figure.get('description', '')
+                    'caption_info': figure.get('caption_info', ''),
+                    'description': figure.get('description', '')
                 })
 
             return figure_paths
@@ -366,7 +370,7 @@ class FileManager:
             if not audio_info:
                 raise Exception("Audio not found")
 
-            temp_path = f"temp_audio_{paper_id}.json"
+            temp_path = f"temp_audio_{paper_id}.mp3"
             downloaded = self.storage_manager.download_file(
                 file_url=audio_info['audio_file_path'],
                 local_path=temp_path,
@@ -389,7 +393,7 @@ class FileManager:
             if not thumbnail_info:
                 raise Exception("Thumbnail not found")
 
-            temp_path = f"temp_thumbnail_{paper_id}.json"
+            temp_path = f"temp_thumbnail_{paper_id}.png"
             downloaded = self.storage_manager.download_file(
                 file_url=thumbnail_info['thumbnail_path'],
                 local_path=temp_path,
