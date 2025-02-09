@@ -23,14 +23,13 @@ from pdf2text import Pdf2Text, pdf_to_image
 from utils import FileManager, MultiChatManager, PaperSummarizer
 # from utils.model_manager import model_manager
 from utils import split_sentences, chunkify_to_num_token, chunkify_with_overlap
-from utils import process_query_with_reranking_compare
+from utils import process_query_with_reranking_compare, query_and_respond
 from api import EmbeddingAPI, ChatCompletionsExecutor, SummarizationExecutor
 
 from datebase.connection import DatabaseConnection
 from datebase.operations import PaperManager, DocumentUploader, ChatHistoryManager, AdditionalFileUploader
 
 from sentence_transformers import SentenceTransformer, CrossEncoder
-from summarizer import Summarizer
 
 logger = logging.getLogger(__name__)
 
@@ -227,6 +226,9 @@ async def chat_message(req: ChatRequest,
                        conn=Depends(get_db_connection),
                        paper_manager: PaperManager = Depends(get_paper_manager)):
     pdf_id, user_id, user_input = req.pdf_id, req.user_id, req.message
+    
+    fig_table_keywords = ['figure', '피규어', 'table', '테이블']
+    is_figure_query = any(keyword in user_input.lower() for keyword in fig_table_keywords)
 
     multi_chat_manager.initialize_chat("")
 
@@ -235,18 +237,29 @@ async def chat_message(req: ChatRequest,
         "jinaai/jina-reranker-v2-base-multilingual", trust_remote_code=True)
 
     # paper_info = paper_manager.get_paper_info(user_id, pdf_id)
-
-    relevant_response = process_query_with_reranking_compare(
-        query=user_input,
-        conn=conn,
-        model=model,
-        reranker=reranker_model,
-        completion_executor=completion_executor,
-        user_id=user_id,
-        paper_id=pdf_id,
-        top_k=3,
-        chat_manager=chat_history_manager
-    )
+    
+    if is_figure_query:
+        relevant_response = query_and_respond(
+            query=user_input,
+            conn=conn,
+            model=model,
+            user_id=user_id,
+            paper_id=pdf_id,
+            top_k=3,
+            chat_manager=chat_history_manager
+        )
+    else:
+        relevant_response = process_query_with_reranking_compare(
+            query=user_input,
+            conn=conn,
+            model=model,
+            reranker=reranker_model,
+            completion_executor=completion_executor,
+            user_id=user_id,
+            paper_id=pdf_id,
+            top_k=3,
+            chat_manager=chat_history_manager
+        )
 
     context_result = chat_history_manager.handle_question(
         user_input, user_id=user_id, paper_id=pdf_id)
@@ -363,23 +376,11 @@ async def pdf2text_table_figure(req: PdfRequest,
 async def summarize_and_get_files(req: PdfRequest,
                                   file_manager: FileManager = Depends(get_file_manager)):
     pdf_id, user_id = req.pdf_id, req.user_id
-    model = Summarizer()
+    paper_summarizer = PaperSummarizer()
 
     paper_file = file_manager.get_paper(user_id, pdf_id)
-
-    results = pdf2text_recognize(paper_file, key="summary")
-
-    label_summaries = []
-    for result in results:
-        summary = model(result, num_sentences=10)
-        label_summaries.append(summary)
-
-    combined_summary = " ".join(label_summaries)
-    final_summary = model(combined_summary, num_sentences=30)
-
-    del model
-    torch.cuda.empty_cache()
-    gc.collect()
+    
+    final_summary = paper_summarizer.generate_summary(paper_file)
 
     file_flag = file_manager.extract_summary_content(
         final_summary=final_summary,

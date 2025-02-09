@@ -8,7 +8,9 @@ torch.backends.cuda.enable_mem_efficient_sdp(False)
 torch.backends.cuda.enable_flash_sdp(False)
 
 
-def conversation_with_images(model_path, images, image_description=None, conversation=None, max_new_tokens=512):
+def conversation_with_images(model_path, images, image_description=None, 
+                             conversation=None, max_new_tokens=512,
+                             timeout=300):
     """
     A function to process conversations with images using the DeepSeek VL model.
     
@@ -64,7 +66,8 @@ def conversation_with_images(model_path, images, image_description=None, convers
         eos_token_id=tokenizer.eos_token_id,
         max_new_tokens=max_new_tokens,
         do_sample=False,
-        use_cache=True
+        use_cache=True,
+        max_time=timeout
     )
 
     # Decode the generated response
