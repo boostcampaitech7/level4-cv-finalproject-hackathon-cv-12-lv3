@@ -15,7 +15,7 @@ class DatabaseConnection:
         if cls._pool is None:
             try:
                 cls._pool = pool.SimpleConnectionPool(
-                    minconn=5,
+                    minconn=3,
                     maxconn=20,
                     host=os.getenv('DB_HOST'),
                     dbname=os.getenv('DB_NAME'),

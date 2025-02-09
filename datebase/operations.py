@@ -16,6 +16,14 @@ class BaseDBHandler:
         self.conn = connection
         # self.db_connection = DatabaseConnection()
 
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.conn:
+            DatabaseConnection._pool.putconn(self.conn)
+            self.conn = None
+
     def execute_query(self, query, params=None):
         try:
             with self.conn.cursor() as cur:
@@ -51,7 +59,6 @@ class BaseDBHandler:
             print(f"쿼리 {query} 실행 중 에러 발생: {str(e)}")
             self.conn.rollback()
             return
-
 
 class SessionManager:
     def __init__(self, connection):
