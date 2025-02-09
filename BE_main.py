@@ -34,12 +34,9 @@ from sentence_transformers import SentenceTransformer, CrossEncoder
 logger = logging.getLogger(__name__)
 
 
-@lru_cache()
 def get_db_connection():
     db_connection = DatabaseConnection()
-    conn = db_connection.connect()
-    return conn
-
+    return db_connection.connect()
 
 def get_file_manager(conn=Depends(get_db_connection)):
     return FileManager(conn)
@@ -520,8 +517,10 @@ async def get_table(req: PdfRequest,
                 'description': table['description']
             })
 
-            os.remove(table['path'])
-            os.remove(table['caption_path'])
+            if os.path.exists(table['path']):
+                os.remove(table['path'])
+            if os.path.exists(table['caption_path']):
+                os.remove(table['caption_path'])
 
         return JSONResponse({
             "success": True,
