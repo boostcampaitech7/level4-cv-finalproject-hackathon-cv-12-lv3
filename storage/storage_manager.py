@@ -48,7 +48,6 @@ class ObjectStorageManager:
                 "path": storage_path
             }
         except Exception as e:
-            print(f"pdf 파일 업로드 중 에러 발생: {str(e)}")
             return None
 
     def upload_figure(self, file_path: str,

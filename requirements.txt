@@ -22,7 +22,6 @@ ninja
 networkx
 scikit-learn
 bert-extractive-summarizer
-fitz
 passlib
 google-cloud-texttospeech
 boto3

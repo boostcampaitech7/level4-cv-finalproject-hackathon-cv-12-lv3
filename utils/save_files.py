@@ -40,7 +40,7 @@ class FileManager:
             file_path = file_input
         else:
             raise TypeError("file_input must be either bytes or str")
-
+    
         try:
             # Object Storage에 PDF 저장
             storage_info = self.storage_manager.upload_pdf(

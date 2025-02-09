@@ -5,6 +5,7 @@ from sentence_transformers import SentenceTransformer
 from hashlib import sha256
 from passlib.context import CryptContext
 from datetime import datetime
+from datebase.connection import DatabaseConnection
 import psycopg2
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -13,6 +14,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 class BaseDBHandler:
     def __init__(self, connection):
         self.conn = connection
+        # self.db_connection = DatabaseConnection()
 
     def execute_query(self, query, params=None):
         try:
@@ -23,6 +25,10 @@ class BaseDBHandler:
                     return cur.fetchall()
                 except psycopg2.ProgrammingError:
                     return None
+        except psycopg2.OperationalError:
+            db_connection = DatabaseConnection()
+            self.conn = db_connection.connect()
+            return self.execute_query(query, params)
         except Exception as e:
             print(f"쿼리 {query} 실행 중 에러 발생: {str(e)}")
             self.conn.rollback()
@@ -37,6 +43,10 @@ class BaseDBHandler:
                     return cur.fetchone()
                 except psycopg2.ProgrammingError:
                     return None
+        except psycopg2.OperationalError:
+            db_connection = DatabaseConnection()
+            self.conn = db_connection.connect()
+            return self.execute_query_one(query, params)
         except Exception as e:
             print(f"쿼리 {query} 실행 중 에러 발생: {str(e)}")
             self.conn.rollback()
@@ -70,7 +80,8 @@ class SessionManager:
 
 class UserManager(BaseDBHandler):
     def __init__(self, connection):
-        self.conn = connection
+        # self.conn = connection
+        super().__init__(connection)
 
     def _hash_password(self, password: str) -> str:
         return pwd_context.hash(password)
@@ -125,7 +136,8 @@ class UserManager(BaseDBHandler):
 
 class PaperManager(BaseDBHandler):
     def __init__(self, connection):
-        self.conn = connection
+        # self.conn = connection
+        super().__init__(connection)
 
     # TODO lang 속성 추가후 초기 저장에는 null값으로
     # TODO paper info 업데이트 하는 함수 필요
@@ -502,7 +514,8 @@ class SearchFileText:
 
 class SummaryFileText(BaseDBHandler):
     def __init__(self, connection):
-        self.conn = connection
+        # self.conn = connection
+        super().__init__(connection)
 
     def update_summary_text(self, user_id, paper_id, summary):
         query = """
@@ -515,7 +528,8 @@ class SummaryFileText(BaseDBHandler):
 
 class AdditionalFileUploader(BaseDBHandler):
     def __init__(self, connection):
-        self.conn = connection
+        # self.conn = connection
+        super().__init__(connection)
 
     def insert_figure_file(self, user_id, paper_id,
                            storage_path, caption_number,
