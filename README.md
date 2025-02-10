@@ -94,10 +94,19 @@
 ## AI Safety
 프롬프트 엔지니어링을 통해 혐오, 차별적 발언을 필터링하고 사용자의 개인 정보를 보호합니다.
 ![image](https://github.com/user-attachments/assets/9a011f78-14c4-4565-9a2a-203a2ac2d5c7)
+직접 구성한 데이터셋을 통해 비교해본 결과, 전반적으로 더 성능이 우수함을 알 수 있었습니다.
+![image](https://github.com/user-attachments/assets/e39a780f-e62b-4553-8309-8092e105186d)
+
 
 ## Comparison with other services
 기존 서비스와의 기능 비교 테이블입니다.
 ![image](https://github.com/user-attachments/assets/c9775f16-7cdf-4063-8531-df62731b531e)
+기존 서비스와의 RAG 성능 리더보드 비교 테이블입니다.
+![image](https://github.com/user-attachments/assets/ac772ca2-42d0-40b9-a7a4-b564465ae916)
+직접 구축한 논문 RAG 데이터셋 비교 테이블입니다.
+![image](https://github.com/user-attachments/assets/04133930-5152-4b58-865f-2d977ee4b084)
+
+
 
 ## Result
 ![시연 영상.gif]()
