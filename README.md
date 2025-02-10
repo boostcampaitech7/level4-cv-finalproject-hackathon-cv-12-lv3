@@ -33,15 +33,14 @@
 
 ✅ **후회 없는 도전**: 완성도 높은 프로젝트를 위해 끊임없이 실험하고 개선하며 최고의 결과를 추구
 
-
 <table align="center">
     <tr align="center">
-        <td><img src="https://stages.ai/_next/image?url=https%3A%2F%2Faistages-api-public-prod.s3.amazonaws.com%2Fapp%2FUsers%2F00003880%2Fuser_image.png&w=1920&q=75" width="120" height="120" alt=""/></td>
-        <td><img src="https://stages.ai/_next/image?url=https%3A%2F%2Faistages-api-public-prod.s3.amazonaws.com%2Fapp%2FUsers%2F00003955%2Fuser_image.png&w=1920&q=75" width="120" height="120" alt=""/></td>
-        <td><img src="https://stages.ai/_next/image?url=https%3A%2F%2Faistages-api-public-prod.s3.amazonaws.com%2Fapp%2FUsers%2F00003894%2Fuser_image.png&w=1920&q=75" width="120" height="120" alt=""/></td>
-        <td><img src="https://stages.ai/_next/image?url=https%3A%2F%2Faistages-api-public-prod.s3.amazonaws.com%2Fapp%2FUsers%2F00003885%2Fuser_image.png&w=1920&q=75" width="120" height="120" alt=""/></td>
-        <td><img src="https://stages.ai/_next/image?url=https%3A%2F%2Faistages-api-public-prod.s3.amazonaws.com%2Fapp%2FUsers%2F00003890%2Fuser_image.png&w=1920&q=75" width="120" height="120" alt=""/></td>
-        <td><img src="https://stages.ai/_next/image?url=https%3A%2F%2Faistages-api-public-prod.s3.amazonaws.com%2Fapp%2FUsers%2F00003872%2Fuser_image.png&w=1920&q=75" width="120" height="120" alt=""/></td>
+        <td><img src="https://github.com/user-attachments/assets/f8a25739-b674-45ac-8906-b0309190da20" width="120" height="120" alt=""/></td>
+        <td><img src="https://github.com/user-attachments/assets/f44720d7-9ef7-4ec5-a5b5-aefc3adea942" width="120" height="120" alt=""/></td>
+        <td><img src="https://github.com/user-attachments/assets/1e7ee17b-6496-409a-a671-112fda17249d" width="120" height="120" alt=""/></td>
+        <td><img src="https://github.com/user-attachments/assets/90ea496b-2888-4a11-9237-779b93baa2a5" width="120" height="120" alt=""/></td>
+        <td><img src="https://github.com/user-attachments/assets/242af21c-2779-4eb5-b070-e44db78db726" width="120" height="120" alt=""/></td>
+        <td><img src="https://github.com/user-attachments/assets/30a3e92d-6bde-4b7b-9f6d-e25860e542a8" width="120" height="120" alt=""/></td>
     </tr>
     <tr align="center">
         <td><a href="https://github.com/lkl4502" target="_blank">오홍석</a></td>
