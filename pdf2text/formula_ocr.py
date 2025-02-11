@@ -1,5 +1,4 @@
 #! pip install transformers>=4.37.0 pillow optimum[onnxruntime]
-from PIL import Image
 from transformers import TrOCRProcessor
 from optimum.onnxruntime import ORTModelForVision2Seq
 
@@ -19,5 +18,4 @@ class FormulaOCR:
         generated_ids = self.model.generate(pixel_values)
         generated_text = self.processor.batch_decode(
             generated_ids, skip_special_tokens=True)
-        # print(f'generated_ids: {generated_ids}, \ngenerated text: {generated_text}')
         return generated_text[0]
