@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from fastapi import FastAPI, UploadFile, status, Depends, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from starlette.background import BackgroundTask
 
 from config.config import AI_CONFIG, API_CONFIG
 from pdf2text import Pdf2Text, pdf_to_image
@@ -32,27 +33,32 @@ from sentence_transformers import SentenceTransformer, CrossEncoder
 logger = logging.getLogger(__name__)
 
 
+# db 연결 설정
 def get_db_connection():
     db_connection = DatabaseConnection()
     return db_connection.connect()
 
-
+# 파일 관리자 file_manager 가져오기
 def get_file_manager(conn=Depends(get_db_connection)):
     return FileManager(conn)
 
-
+# 논문 정보 관리 paper_manager 불러오기
 def get_paper_manager(conn=Depends(get_db_connection)):
     return PaperManager(conn)
 
-
+# 문서 관리하는 document_manager 불러오기
 def get_document_manager(conn=Depends(get_db_connection)):
     return DocumentUploader(conn)
 
-
+# 파일 업로드하는 file_uploader 불러오기
 def get_add_file_uploader(conn=Depends(get_db_connection)):
     return AdditionalFileUploader(conn)
 
+# 채팅 매니저 chat_manger 불러오기
+def get_chat_manager(conn=Depends(get_db_connection)):
+    return ChatHistoryManager(conn, embedding_api, completion_executor)
 
+# 사용하는 API들 불러오기 (임베딩 API, 네이버 Chat API, 요약 API)
 embedding_api = EmbeddingAPI(
     host=API_CONFIG['host2'],
     api_key=API_CONFIG['api_key'],
@@ -74,11 +80,7 @@ chat_history_manager = ChatHistoryManager(
     get_db_connection(), embedding_api, completion_executor
 )
 
-
-def get_chat_manager(conn=Depends(get_db_connection)):
-    return ChatHistoryManager(conn, embedding_api, completion_executor)
-
-
+# FastAPI 선언 및 middleware 추가
 app = FastAPI()
 
 app.add_middleware(
@@ -89,7 +91,7 @@ app.add_middleware(
     allow_headers=["*"],  # 모든 헤더 허용
 )
 
-
+# 정보 요청 Type, 기본 Request, 기본 Response 클래스 설정
 class InfoType(str, Enum):
     all = "all"
     head = "head"
@@ -105,7 +107,7 @@ class BaseResponse(BaseModel):
     message: Optional[str] = None
     data: Optional[Dict[str, Any]] = None
 
-
+# Pdf에 대한 요청 설정
 class PdfRequest(BaseRequest):
     @classmethod
     def as_form(
@@ -115,7 +117,7 @@ class PdfRequest(BaseRequest):
     ):
         return cls(user_id=user_id, pdf_id=pdf_id)
 
-
+# 저장된 여러 pdf 정보 요청 설정
 class MultiPdfRequest(BaseModel):
     pdf_ids: List[int]
     user_id: str = "admin"
@@ -129,16 +131,11 @@ class MultiPdfRequest(BaseModel):
         pdf_id_list = [int(id_) for id_ in pdf_ids.split(',')]
         return cls(user_id=user_id, pdf_ids=pdf_id_list)
 
-
+# 채팅 요청 기본 설정
 class ChatRequest(BaseRequest):
     message: str = ""
 
-
-@app.get("/", response_model=BaseResponse, response_model_exclude_unset=True)
-def test():
-    return {'success': True, 'message': "테스트 성공"}
-
-
+# pdf 파일 업로드 Endpoint
 @app.post("/pdf", response_model=BaseResponse, response_model_exclude_unset=True)
 async def upload_pdf(file: UploadFile,
                      req: PdfRequest = Depends(PdfRequest.as_form),
@@ -179,7 +176,7 @@ async def upload_pdf(file: UploadFile,
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f"PDF 업로드 중 오류 발생: {str(e)}")
 
-
+# 업로드된 pdf 기반 챗봇 준비 Endpoint
 @app.post("/chat-bot", response_model=BaseResponse, response_model_exclude_unset=True)
 async def prepare_chatbot_base(req: PdfRequest,
                                file_manager: FileManager = Depends(
@@ -213,7 +210,7 @@ async def prepare_chatbot_base(req: PdfRequest,
                             detail=f"Document 업로드 중에 오류 발생 : {str(e)}")
     return {"success": True, "message": "대화를 할 준비가 되었습니다!! 궁금하신 점을 질문주세요!"}
 
-
+# 챗봇 대화 요청 및 수신, 송신 Endpoint
 @app.post("/chat-bot/message", response_model=BaseResponse, response_model_exclude_unset=True)
 async def chat_message(req: ChatRequest,
                        conn=Depends(get_db_connection)):
@@ -316,7 +313,7 @@ async def chat_message(req: ChatRequest,
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f"답변 생성 중 오류 발생 : {str(e)}")
 
-
+# 논문의 Table, Figure 정보 요청 Endpoint
 @app.post("/table-figure", response_model=BaseResponse, response_model_exclude_unset=True)
 async def pdf2text_table_figure(req: PdfRequest,
                                 file_manager: FileManager = Depends(get_file_manager)):
@@ -367,6 +364,7 @@ async def summarize_and_get_files(req: PdfRequest,
     pdf_id, user_id = req.pdf_id, req.user_id
     paper_summarizer = PaperSummarizer()
 
+    paper_file = None
     paper_file = file_manager.get_paper(user_id, pdf_id)
 
     final_summary = paper_summarizer.generate_summary(paper_file)
@@ -378,11 +376,18 @@ async def summarize_and_get_files(req: PdfRequest,
         paper_id=pdf_id
     )
 
+    if os.path.exists(paper_file):
+        os.remove(paper_file)
+
+    del paper_summarizer
+    torch.cuda.empty_cache()
+    gc.collect()
+
     if file_flag:
         return {"success": True, "message": "요약 및 오디오, 태그, 타임라인 생성이 완료되었습니다."}
     return {"success": False, "message": "Summarize 중 에러 발생"}
 
-
+# 논문 원본 파일 불러오기 Endpoint
 @app.post("/pdf/get_paper")
 async def get_paper(req: PdfRequest,
                     file_manager: FileManager = Depends(get_file_manager)):
@@ -390,10 +395,15 @@ async def get_paper(req: PdfRequest,
     pdf_path = file_manager.get_paper(user_id, pdf_id)
 
     if pdf_path:
-        return FileResponse(pdf_path, media_type="application/pdf")
+        return FileResponse(
+            pdf_path, 
+            media_type="application/pdf",
+            background=BackgroundTask(lambda: os.remove(pdf_path) 
+                                      if os.path.exists(pdf_path) else None)
+        )
     return {'success': False, "message": "Paper not found"}
 
-
+# 번역 논문 파일 불러오기 Endpoint
 @app.post("/pdf/get_translate_paper")
 async def get_translate_paper(req: PdfRequest,
                               file_manager: FileManager = Depends(get_file_manager)):
@@ -404,7 +414,7 @@ async def get_translate_paper(req: PdfRequest,
         return FileResponse(pdf_path, media_type="application/pdf")
     return {'success': False, "message": "Translate Paper not found"}
 
-
+# 논문 Figure 이미지 파일 불러오기 Endpoint
 @app.post("/pdf/get_figure")
 async def get_figure(req: PdfRequest,
                      file_manager: FileManager = Depends(get_file_manager)):
@@ -440,7 +450,7 @@ async def get_figure(req: PdfRequest,
         })
     return {'success': False, "message": "Figures not found"}
 
-
+# 논문 Timeline 파일 불러오기 Endpoint
 @app.post("/pdf/get_timeline")
 async def get_timeline(req: PdfRequest,
                        file_manager: FileManager = Depends(get_file_manager)):
@@ -448,10 +458,15 @@ async def get_timeline(req: PdfRequest,
     timeline_path = file_manager.get_timeline(user_id, pdf_id)
 
     if timeline_path:
-        return FileResponse(timeline_path, media_type="application/json")
+        return FileResponse(
+            timeline_path, 
+            media_type="application/json",
+            background=BackgroundTask(lambda: os.remove(timeline_path) 
+                                      if os.path.exists(timeline_path) else None)
+        )
     return {'success': False, "message": "Timeline not found"}
 
-
+# 논문으로 추출한 Audio 파일 불러오기 Endpoint
 @app.post("/pdf/get_audio")
 async def get_audio(req: PdfRequest,
                     file_manager: FileManager = Depends(get_file_manager)):
@@ -459,10 +474,15 @@ async def get_audio(req: PdfRequest,
     audio_path = file_manager.get_audio(user_id, pdf_id)
 
     if audio_path:
-        return FileResponse(audio_path, media_type="audio/mpeg")
+        return FileResponse(
+            audio_path, 
+            media_type="audio/mpeg",
+            background=BackgroundTask(lambda: os.remove(audio_path) 
+                                      if os.path.exists(audio_path) else None)
+        )
     return {'success': False, "message": "Audio not found"}
 
-
+# 논문으로 추출한 Audiobook 썸네일 파일 불러오기 Endpoint
 @app.post("/pdf/get_thumbnail")
 async def get_thumbnail(req: PdfRequest,
                         file_manager: FileManager = Depends(get_file_manager)):
@@ -470,10 +490,15 @@ async def get_thumbnail(req: PdfRequest,
     thumbnail_path = file_manager.get_thumbnail(user_id, pdf_id)
 
     if thumbnail_path:
-        return FileResponse(thumbnail_path, media_type="image/png")
+        return FileResponse(
+            thumbnail_path, 
+            media_type="image/png",
+            background=BackgroundTask(lambda: os.remove(thumbnail_path) 
+                                      if os.path.exists(thumbnail_path) else None)
+        )
     return {'success': False, "message": "Thumbnail not found"}
 
-
+# 오디오북 대본 불러오기 Endpoint
 @app.post("/pdf/get_script")
 async def get_script(req: PdfRequest,
                      file_manager: FileManager = Depends(get_file_manager)):
@@ -481,10 +506,15 @@ async def get_script(req: PdfRequest,
     script_path = file_manager.get_script(user_id, pdf_id)
 
     if script_path:
-        return FileResponse(script_path, media_type="application/json")
+        return FileResponse(
+            script_path, 
+            media_type="application/json",
+            background=BackgroundTask(lambda: os.remove(script_path) 
+                                      if os.path.exists(script_path) else None)
+        )
     return {'success': False, "message": "Thumbnail not found"}
 
-
+# 논문 Table 이미지 불러오기 Endpoint
 @app.post("/pdf/get_table")
 async def get_table(req: PdfRequest,
                     file_manager: FileManager = Depends(get_file_manager)):
@@ -523,7 +553,7 @@ async def get_table(req: PdfRequest,
 
     return {'success': False, "message": "Table information not found"}
 
-
+# 특정 유저에 대한 채팅 기록 기반 대화 했던 논문 정보 조회 Endpoint
 @app.post("/pdf/get_users_hist")
 async def get_users_hist(req: PdfRequest,
                          additional_uploader: AdditionalFileUploader = Depends(get_add_file_uploader)):
@@ -534,7 +564,7 @@ async def get_users_hist(req: PdfRequest,
         return {'success': True, "data": hist_info}
     return {'success': False, 'message': "No chat history found"}
 
-
+# 채팅 기록 조회 Endpoint
 @app.post("/pdf/get_chat_hist")
 async def get_chat_hist(req: PdfRequest,
                         chat_history_manager: ChatHistoryManager = Depends(get_chat_manager)):
@@ -545,7 +575,7 @@ async def get_chat_hist(req: PdfRequest,
         return {"success": True, "chat_hist": chat_hist}
     return {"success": False, "message": "채팅 기록 불러오기 중 에러 발생"}
 
-
+# 요약 정보 조회 Endpoint
 @app.post("/pdf/get_summary")
 async def get_summary(req: PdfRequest,
                       paper_manager: PaperManager = Depends(get_paper_manager)):
@@ -559,7 +589,7 @@ async def get_summary(req: PdfRequest,
         }
     return {"success": False, "message": "요약 불러오기 중 에러 발생"}
 
-
+# 태그 정보 조회 Endpoint
 @app.post("/pdf/get_tags")
 async def get_tags(req: PdfRequest,
                    additional_uploader: AdditionalFileUploader = Depends(get_add_file_uploader)):
@@ -573,7 +603,7 @@ async def get_tags(req: PdfRequest,
         }
     return {"success": False, "message": "태그 정보를 찾을 수 없습니다."}
 
-
+# 논문 요약 정보 조회 Endpoint
 @app.post("/pdf/get_summary_pdf_id")
 async def get_summary_pdf_id(req: PdfRequest,
                              paper_manager: PaperManager = Depends(get_paper_manager)):
@@ -587,7 +617,7 @@ async def get_summary_pdf_id(req: PdfRequest,
         }
     return {"success": False, "message": "요약된 PDF ID를 찾을 수 없습니다."}
 
-
+# 요약, 오디오, 썸네일, 논문, 태그 등 원하는 정보 일괄 요청 Endpoint
 @app.post("/pdf/get_all_summary_info/{info_type}")
 async def get_all_summary_info(info_type: InfoType,
                                req: MultiPdfRequest,
@@ -641,7 +671,8 @@ async def get_all_summary_info(info_type: InfoType,
                                 'image': img_data,
                                 'figure_number': fig['figure_number'],
                                 'caption_info': fig['caption_info'],
-                                'description': fig['description']
+                                'description': fig['description'],
+                                'caption_path': fig['caption_path']
                             })
                         os.remove(fig['path'])
                     response_data["json_data"]["figures"] = figures_data
@@ -703,7 +734,7 @@ def pdf2text_recognize(pdf):
 
     return sentences
 
-
+# 추출된 텍스트 정보들을 활용하여 Chunking과 Embedding 생성
 def chunking_embedding(sentences, new_data, size=256):
     total_chunks = [chunkify_to_num_token(
         sentence, size) for sentence in sentences]
@@ -729,7 +760,7 @@ def chunking_embedding(sentences, new_data, size=256):
 
     return chunked_documents
 
-
+# 논문 번역 cmd 실행
 def run_translate(file_name):
     command = ["python", "utils/translate.py", file_name]
     subprocess.run(command, capture_output=True, text=True)

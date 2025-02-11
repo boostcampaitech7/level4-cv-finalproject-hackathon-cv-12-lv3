@@ -254,9 +254,10 @@ class DocumentUploader:
             cur.close()
 
 
-class ChatHistoryManager:
+class ChatHistoryManager(BaseDBHandler):
     def __init__(self, connection, embedding_api, chat_api):
-        self.conn = connection
+        # self.conn = connection
+        super().__init__(connection)
         self.embedding_api = embedding_api
         self.chat_api = chat_api
         self.cache = {}
@@ -270,29 +271,20 @@ class ChatHistoryManager:
     def store_chat(self, user_id, paper_id, role, message, parent_id=None,
                    is_summary=False, summary_for_chat_id=None, context_docs=None,
                    embedding=None, chat_type=None):
-        try:
-            cur = self.conn.cursor()
-
-            cur.execute("""
-                INSERT INTO public.chat_hist
-                (user_id, paper_id, role, message, parent_message_id,
-                 is_summary, summary_for_chat_id, context_docs,
-                 embedding, chat_type)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING chat_id
-            """, (user_id, paper_id, role, message, parent_id,
-                  is_summary, summary_for_chat_id, context_docs,
-                  embedding, chat_type))
-
-            chat_id = cur.fetchone()[0]
-            self.conn.commit()
-            return chat_id
-        except Exception as e:
-            self.conn.rollback()
-            print(f"채팅 로그 저장 중 에러 발생: {str(e)}")
-            raise
-        finally:
-            cur.close()
+        query = """
+            INSERT INTO public.chat_hist
+            (user_id, paper_id, role, message, parent_message_id,
+                is_summary, summary_for_chat_id, context_docs,
+                embedding, chat_type)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING chat_id
+        """
+        params = (user_id, paper_id, role, message, parent_id,
+                is_summary, summary_for_chat_id, context_docs,
+                embedding, chat_type)
+        
+        result = self.execute_query_one(query, params)
+        return result[0] if result else None
 
     def store_conversation(self, user_id, paper_id, user_message, llm_response,
                            parent_id=None, context_docs=None, embedding=None,
@@ -351,28 +343,21 @@ class ChatHistoryManager:
 
     def get_chat_history(self, user_id, paper_id, limit=None):
         """ 세션 히스토리 조회 """
-        try:
-            cur = self.conn.cursor()
+        query = """
+            SELECT chat_id, role, message, created_at, is_summary
+            FROM public.chat_hist
+            WHERE user_id = %s
+            AND paper_id = %s
+            ORDER BY created_at
+        """
+        params = (user_id, paper_id) if not limit else (user_id, paper_id, limit)
 
-            query = """
-                SELECT chat_id, role, message, created_at, is_summary
-                FROM public.chat_hist
-                WHERE user_id = %s
-                AND paper_id = %s
-                ORDER BY created_at
-            """
-            if limit:
-                query += " LIMIT %s "
-                cur.execute(query, (user_id, paper_id, limit))
-            else:
-                cur.execute(query, (user_id, paper_id))
+        if limit:
+            query += " LIMIT %s"
+        
+        result = self.execute_query(query, params)
 
-            return cur.fetchall()
-        except Exception as e:
-            print(f"대화 불러오기 중 에러 발생: {str(e)}")
-            raise
-        finally:
-            cur.close()
+        return result
 
     def find_related_conversations(self, current_question, user_id,
                                    paper_id, similarity_threshold=0.85):
