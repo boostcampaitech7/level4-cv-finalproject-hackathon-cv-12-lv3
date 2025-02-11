@@ -4,6 +4,7 @@ import time
 import json
 import requests
 
+
 class OCRAPIExecutor:
     def __init__(self, host, secret_key):
         """
@@ -27,11 +28,11 @@ class OCRAPIExecutor:
         request_json = {
             'images': [
                 {
-                    'format': 'jpg',  
-                    'name': 'demo'  
+                    'format': 'jpg',
+                    'name': 'demo'
                 }
             ],
-            'requestId': str(uuid.uuid4()), 
+            'requestId': str(uuid.uuid4()),
             'version': 'V2',
             'timestamp': int(round(time.time() * 1000))
         }
@@ -51,7 +52,8 @@ class OCRAPIExecutor:
         :return: OCR 결과 (JSON 형식)
         """
         headers, payload, files = self._prepare_request(image)
-        response = requests.post(self._api_url, headers=headers, data=payload, files=files)
+        response = requests.post(
+            self._api_url, headers=headers, data=payload, files=files)
         if response.status_code == 200:
             return response.json()
         else:

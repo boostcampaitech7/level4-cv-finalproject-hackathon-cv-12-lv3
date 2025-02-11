@@ -18,19 +18,23 @@ results_df = pd.read_csv(input_csv_path, encoding="utf-8-sig")
 start_index = 166
 
 # 질문, 생성된 답변, 정답 추출 (지정된 인덱스부터)
-question_list = results_df["Question"].tolist()[start_index-1:] # 229번부터 시작이므로 228번까지는 제외
-generated_answers_list = results_df["Generated Answer"].tolist()[start_index-1:]
+question_list = results_df["Question"].tolist(
+)[start_index-1:]  # 229번부터 시작이므로 228번까지는 제외
+generated_answers_list = results_df["Generated Answer"].tolist()[
+    start_index-1:]
 target_answers_list = results_df["Target Answer"].tolist()[start_index-1:]
 
 openai_api_key = AI_CONFIG['openai']
 anthropic_api_key = AI_CONFIG['claude']
 
 # 평가 진행
-evaluation_results = llm_evaluate(question_list, generated_answers_list, target_answers_list, openai_api_key, anthropic_api_key)
+evaluation_results = llm_evaluate(
+    question_list, generated_answers_list, target_answers_list, openai_api_key, anthropic_api_key)
 
 # 평가 결과를 DataFrame에 추가 (원래 DataFrame에 추가하기 위해 index 조정)
-results_df["evaluation"] = "" # 빈 column 추가
-results_df.loc[start_index-1:, "evaluation"] = evaluation_results # 229번 index 부터 evaluation 결과 추가
+results_df["evaluation"] = ""  # 빈 column 추가
+# 229번 index 부터 evaluation 결과 추가
+results_df.loc[start_index-1:, "evaluation"] = evaluation_results
 
 # 평가 결과를 포함한 CSV 파일 저장
 evaluated_csv_path = "output/evaluated_results_ml.csv"

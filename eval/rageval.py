@@ -9,6 +9,7 @@ from langchain.chains import LLMChain
 from langchain_core.prompts import PromptTemplate
 import os
 
+
 def llm_evaluate(questions: list, generated_answers: list, target_answers: list, openai_api_key: str, anthropic_api_key: str) -> list:
     """
     여러 평가 방법을 사용하여 LLM이 생성한 답변을 종합 평가합니다.
@@ -71,7 +72,8 @@ def llm_evaluate(questions: list, generated_answers: list, target_answers: list,
         for idx, (question, target_answer, generated_answer) in enumerate(zip(tqdm(questions), target_answers, generated_answers)):
             try:
                 llm_result = chain.run(
-                    {"question": question, "reference_answer": target_answer, "llm_answer": generated_answer}
+                    {"question": question, "reference_answer": target_answer,
+                        "llm_answer": generated_answer}
                 )
                 eval_check.append(int(llm_result))
                 print(f"Tonic {idx + 1}: {int(llm_result)}")
@@ -94,7 +96,8 @@ def llm_evaluate(questions: list, generated_answers: list, target_answers: list,
         for idx, (question, target_answer, generated_answer) in enumerate(zip(tqdm(questions), target_answers, generated_answers)):
             try:
                 llm_result = chain.run(
-                    {"question": question, "reference_answer": target_answer, "llm_answer": generated_answer}
+                    {"question": question, "reference_answer": target_answer,
+                        "llm_answer": generated_answer}
                 )
                 eval_check.append(int(llm_result))
                 print(f"Allganize {idx + 1}: {int(llm_result)}")
@@ -106,7 +109,8 @@ def llm_evaluate(questions: list, generated_answers: list, target_answers: list,
 
     # MLflow 평가
     def mlflow_eval(question_list: list, answer_list: list, ground_truth_list: list, model: str):
-        eval_data = pd.DataFrame({"inputs": question_list, "predictions": answer_list, "ground_truth": ground_truth_list})
+        eval_data = pd.DataFrame(
+            {"inputs": question_list, "predictions": answer_list, "ground_truth": ground_truth_list})
 
         with mlflow.start_run():
             # MLflow 평가 실행
@@ -114,8 +118,8 @@ def llm_evaluate(questions: list, generated_answers: list, target_answers: list,
                 data=eval_data,
                 targets="ground_truth",
                 predictions="predictions",
-                extra_metrics=[ 
-                    #mlflow.metrics.genai.answer_similarity(model=model),
+                extra_metrics=[
+                    # mlflow.metrics.genai.answer_similarity(model=model),
                     mlflow.metrics.genai.answer_correctness(model=model),
                 ],
                 evaluators="default",
@@ -123,7 +127,8 @@ def llm_evaluate(questions: list, generated_answers: list, target_answers: list,
 
             eval_table = results.tables["eval_results_table"]
             # mlflow_answer_similarity = eval_table["answer_similarity/v1/score"].tolist()
-            mlflow_answer_correctness = eval_table["answer_correctness/v1/score"].tolist()
+            mlflow_answer_correctness = eval_table["answer_correctness/v1/score"].tolist(
+            )
 
         # 결과 출력 (인덱스와 함께)
         # for idx, score in enumerate(mlflow_answer_similarity):
@@ -155,10 +160,14 @@ def llm_evaluate(questions: list, generated_answers: list, target_answers: list,
     ) -> list:
         e2e_result = []
         for idx in range(len(tonic_answer_similarity)):
-            tonic_answer_similarity_ox = get_evaluation_result(tonic_answer_similarity[idx])
-            mlflow_answer_similarity_ox = get_evaluation_result(mlflow_answer_similarity[idx])
-            mlflow_answer_correctness_ox = get_evaluation_result(mlflow_answer_correctness[idx])
-            allganize_answer_correctness_ox = "O" if allganize_answer_correctness[idx] == 1 else "X"
+            tonic_answer_similarity_ox = get_evaluation_result(
+                tonic_answer_similarity[idx])
+            mlflow_answer_similarity_ox = get_evaluation_result(
+                mlflow_answer_similarity[idx])
+            mlflow_answer_correctness_ox = get_evaluation_result(
+                mlflow_answer_correctness[idx])
+            allganize_answer_correctness_ox = "O" if allganize_answer_correctness[
+                idx] == 1 else "X"
 
             result = most_frequent_element(
                 [
@@ -176,7 +185,8 @@ def llm_evaluate(questions: list, generated_answers: list, target_answers: list,
     # # 평가 실행
     # tonic_answer_similarity = tonic_validate(questions, generated_answers, target_answers, model="gpt-3.5-turbo")
     # allganize_answer_correctness = allganize_eval(questions, generated_answers, target_answers, model="claude-3-opus-20240229")
-    mlflow_answer_correctness = mlflow_eval(questions, generated_answers, target_answers, model="openai:/gpt-3.5-turbo")
+    mlflow_answer_correctness = mlflow_eval(
+        questions, generated_answers, target_answers, model="openai:/gpt-3.5-turbo")
 
     # # 결과 종합
     # final_results = eval_vote(tonic_answer_similarity, mlflow_answer_similarity, mlflow_answer_correctness, allganize_answer_correctness)
