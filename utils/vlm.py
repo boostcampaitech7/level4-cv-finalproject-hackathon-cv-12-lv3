@@ -7,6 +7,7 @@ torch.backends.cuda.enable_flash_sdp(False)
 
 
 def conversation_with_images(model_path, images, image_description=None,
+                             vl_chat_processor=None, vl_gpt=None, 
                              conversation=None, max_new_tokens=512,
                              timeout=300):
     """
@@ -38,10 +39,12 @@ def conversation_with_images(model_path, images, image_description=None,
         ]
 
     # Load the pre-trained model and processor
-    vl_chat_processor = VLChatProcessor.from_pretrained(model_path)
+    if vl_chat_processor is None:
+        vl_chat_processor = VLChatProcessor.from_pretrained(model_path)
     tokenizer = vl_chat_processor.tokenizer
-    vl_gpt = AutoModelForCausalLM.from_pretrained(
-        model_path, trust_remote_code=True)
+    if vl_gpt is None:
+        vl_gpt = AutoModelForCausalLM.from_pretrained(
+            model_path, trust_remote_code=True)
 
     # Move the model to GPU with bfloat16 precision
     vl_gpt = vl_gpt.to(torch.bfloat16).cuda().eval()

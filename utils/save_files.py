@@ -2,6 +2,8 @@ from storage import ObjectStorageManager
 from database import PaperManager, AdditionalFileUploader, DocumentUploader
 from typing import Dict
 from dotenv import load_dotenv
+from transformers import AutoModelForCausalLM
+from model.deepseek_vl.models import VLChatProcessor
 from .summary_short import abstractive_summarization
 from .timeline import extract_keywords, abstractive_timeline
 from .script import write_full_script
@@ -13,6 +15,8 @@ import random
 import tempfile
 from PIL import Image
 import traceback
+import torch
+import gc
 load_dotenv()
 
 
@@ -85,6 +89,10 @@ class FileManager:
         """Figure랑 Table 저장 후 Vector DB 저장까지"""
         try:
             chunked_documents = []
+            model_path = "deepseek-ai/deepseek-vl-7b-chat"
+            vl_chat_processor = VLChatProcessor.from_pretrained(model_path)
+            vl_gpt = AutoModelForCausalLM.from_pretrained(
+                model_path, trust_remote_code=True)
             # figure 처리
             if 'figure' in match_res:
                 for figure in match_res['figure']:
@@ -109,10 +117,12 @@ class FileManager:
                     # DeepSeek 처리
                     image = Image.open(path_dict['figure_path'])
                     caption = "This is Transformer Acheitecture img"
-                    response = conversation_with_images("deepseek-ai/deepseek-vl-7b-chat",
+                    response = conversation_with_images(model_path,
                                                         [image],
                                                         image_description=figure['caption_text']
                                                         if figure['caption_text'] else caption,
+                                                        vl_chat_processor=vl_chat_processor,
+                                                        vl_gpt=vl_gpt,
                                                         timeout=600)
                     trans_response = translate_clova(
                         response, completion_executor)
@@ -141,6 +151,9 @@ class FileManager:
 
                     for path in path_dict:
                         os.remove(path_dict[path])
+                del vl_chat_processor, vl_gpt
+                torch.cuda.empty_cache()
+                gc.collect()
 
             # table 처리
             if 'table' in match_res:

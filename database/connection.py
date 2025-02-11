@@ -16,7 +16,7 @@ class DatabaseConnection:
             try:
                 cls._pool = pool.SimpleConnectionPool(
                     minconn=3,
-                    maxconn=20,
+                    maxconn=25,
                     host=os.getenv('DB_HOST'),
                     dbname=os.getenv('DB_NAME'),
                     user=os.getenv('DB_USER'),
