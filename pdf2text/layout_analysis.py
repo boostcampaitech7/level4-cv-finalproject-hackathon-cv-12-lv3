@@ -219,8 +219,6 @@ class LayoutAnalyzer:
 def fetch_column_info(layout_res, w, h):
     # 레이아웃 분석 결과의 요소들을 col을 기준으로 분류하는 함수
     # xmin값을 기준으로 layout 분석 결과 정렬
-
-    # TODO 정렬 기준 다시 고민해서 처리하기, 전부 같은 col로 처리되는 중
     layout_res.sort(key=lambda x: x["position"][0][0])
 
     # 열 너비 계산

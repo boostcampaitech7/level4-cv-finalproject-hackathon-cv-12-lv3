@@ -9,7 +9,6 @@ def save_image(image, path):
     if isinstance(image, np.ndarray):
         image = Image.fromarray(image)
     image.save(path)
-    # TODO PIL or Ndarray 아닐 때 TypeError 처리 해야됨.
 
 
 def save_json(data, path):

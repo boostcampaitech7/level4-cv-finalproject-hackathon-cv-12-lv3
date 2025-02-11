@@ -147,9 +147,6 @@ class PaperManager(BaseDBHandler):
         # self.conn = connection
         super().__init__(connection)
 
-    # TODO lang 속성 추가후 초기 저장에는 null값으로
-    # TODO paper info 업데이트 하는 함수 필요
-    # TODO 업데이트 하는 함수를 통해서 lang값 추출 후 적용해야함.
     def store_paper_info(self, user_id: str, title: str, author: str = None,
                          pdf_file_path: str = None):
         query = """
@@ -195,7 +192,6 @@ class PaperManager(BaseDBHandler):
         result = self.execute_query_one(query, (user_id, paper_id))
 
         if result:
-            # TODO lang 속성 추가
             return {
                 'paper_id': result[0],
                 'user_id': result[1],

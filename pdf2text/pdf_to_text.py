@@ -34,7 +34,6 @@ class Pdf2Text(object):
             img = image.convert('RGB')
 
         layout_output, _ = self.layout_analysis.parse(img)
-        # NOTE fitz에서 제공하는 page_id or page_number를 추가?
         final_outputs, caption_outputs = [], []
         table_figure_outputs = []
         for idx, layout_ele in enumerate(layout_output):
@@ -88,7 +87,6 @@ class Pdf2Text(object):
                 # final_outputs.append(self.table_ocr.ocr(crop_img))
 
             elif ele_type == ElementType.FIGURE:
-                # NOTE 이미지의 경우에는 어떤 방식으로 처리할지 결정되면 진행
                 new_bbox = expand_bbox_with_original(img, bbox, 10, 10)
                 table_figure_outputs.append({
                     'obj': new_bbox,
@@ -113,8 +111,6 @@ class Pdf2Text(object):
         # 'caption_text': caption_text
         match_res, unmatch_res = matching_captioning(
             caption_outputs, table_figure_outputs)
-
-        # TODO 분리해낸 Table, Figure를 어떤 방식으로 제공할 것인가?
 
         return " ".join(final_outputs), match_res, unmatch_res
 

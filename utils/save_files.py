@@ -16,9 +16,6 @@ from PIL import Image
 import traceback
 load_dotenv()
 
-# TODO 이거 임시 파일 만들고 삭제하는 로직은 나중에 추가하기
-# save_files.py
-
 
 class FileManager:
     def __init__(self, conn):
@@ -294,7 +291,6 @@ class FileManager:
             print("Traceback:", traceback.format_exc())
             return False
 
-    # TODO Paper부터 다른 가져오는 기능 임시 파일 삭제하는거 만들기
     def get_paper(self, user_id: str, paper_id: int) -> str:
         """Storage에서 PDF 파일 가져오는 메서드"""
         try:
