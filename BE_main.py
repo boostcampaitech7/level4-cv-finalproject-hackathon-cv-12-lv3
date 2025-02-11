@@ -8,7 +8,6 @@ import logging
 from typing import List
 from typing import Dict, Any, Optional
 from collections import defaultdict
-from functools import lru_cache
 from base64 import b64encode
 from hashlib import sha256
 from enum import Enum
@@ -16,13 +15,12 @@ from enum import Enum
 from pydantic import BaseModel
 from fastapi import FastAPI, UploadFile, status, Depends, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse
 
 from config.config import AI_CONFIG, API_CONFIG
 from pdf2text import Pdf2Text, pdf_to_image
 from utils import FileManager, MultiChatManager, PaperSummarizer
-# from utils.model_manager import model_manager
-from utils import split_sentences, chunkify_to_num_token, chunkify_with_overlap
+from utils import split_sentences, chunkify_to_num_token
 from utils import process_query_with_reranking_compare, query_and_respond
 from api import EmbeddingAPI, ChatCompletionsExecutor, SummarizationExecutor
 
@@ -37,6 +35,7 @@ logger = logging.getLogger(__name__)
 def get_db_connection():
     db_connection = DatabaseConnection()
     return db_connection.connect()
+
 
 def get_file_manager(conn=Depends(get_db_connection)):
     return FileManager(conn)
@@ -145,7 +144,7 @@ async def upload_pdf(file: UploadFile,
                      req: PdfRequest = Depends(PdfRequest.as_form),
                      file_manager: FileManager = Depends(get_file_manager),
                      chat_manager: ChatHistoryManager = Depends(get_chat_manager)):
-    pdf_id, user_id = req.pdf_id, req.user_id
+    user_id = req.user_id
     try:
         print("=== Debug Info ===")
         print(f"File received: {file.filename}")
@@ -154,9 +153,6 @@ async def upload_pdf(file: UploadFile,
         if not file.filename.endswith('.pdf'):
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                                 detail="PDF 파일만 업로드 가능합니다.")
-
-        # Byte로 변경
-        # stream = io.BytesIO(await file.read())
 
         file_content = await file.read()
         print(f"File content length: {len(file_content)}")
@@ -220,12 +216,12 @@ async def prepare_chatbot_base(req: PdfRequest,
 
 @app.post("/chat-bot/message", response_model=BaseResponse, response_model_exclude_unset=True)
 async def chat_message(req: ChatRequest,
-                       conn=Depends(get_db_connection),
-                       paper_manager: PaperManager = Depends(get_paper_manager)):
+                       conn=Depends(get_db_connection)):
     pdf_id, user_id, user_input = req.pdf_id, req.user_id, req.message
-    
+
     fig_table_keywords = ['figure', '피규어', 'table', '테이블']
-    is_figure_query = any(keyword in user_input.lower() for keyword in fig_table_keywords)
+    is_figure_query = any(keyword in user_input.lower()
+                          for keyword in fig_table_keywords)
 
     multi_chat_manager.initialize_chat("")
 
@@ -233,8 +229,6 @@ async def chat_message(req: ChatRequest,
     reranker_model = CrossEncoder(
         "jinaai/jina-reranker-v2-base-multilingual", trust_remote_code=True)
 
-    # paper_info = paper_manager.get_paper_info(user_id, pdf_id)
-    
     if is_figure_query:
         relevant_response = query_and_respond(
             query=user_input,
@@ -366,8 +360,6 @@ async def pdf2text_table_figure(req: PdfRequest,
         return {"success": True, "message": "Table과 Figure에 대한 처리가 완료되었습니다. 이제 해당 부분에 대한 답변도 가능합니다~!"}
     return {"success": False, "message": "Embedding 값 저장 중 오류 발생"}
 
-# 요약 및 오디오, 태그, 타임라인 파일 생성하기
-
 
 @app.post("/pdf/summarize", response_model=BaseResponse, response_model_exclude_unset=True)
 async def summarize_and_get_files(req: PdfRequest,
@@ -376,7 +368,7 @@ async def summarize_and_get_files(req: PdfRequest,
     paper_summarizer = PaperSummarizer()
 
     paper_file = file_manager.get_paper(user_id, pdf_id)
-    
+
     final_summary = paper_summarizer.generate_summary(paper_file)
 
     file_flag = file_manager.extract_summary_content(
@@ -529,15 +521,13 @@ async def get_table(req: PdfRequest,
             }
         })
 
-    # if table_info:
-    #     return {'success': True, "data": {"tables": table_info}}
     return {'success': False, "message": "Table information not found"}
 
 
 @app.post("/pdf/get_users_hist")
 async def get_users_hist(req: PdfRequest,
                          additional_uploader: AdditionalFileUploader = Depends(get_add_file_uploader)):
-    user_id, pdf_id = req.user_id, req.pdf_id
+    user_id = req.user_id
     hist_info = additional_uploader.search_users_hist(user_id)
 
     if hist_info:
@@ -587,7 +577,7 @@ async def get_tags(req: PdfRequest,
 @app.post("/pdf/get_summary_pdf_id")
 async def get_summary_pdf_id(req: PdfRequest,
                              paper_manager: PaperManager = Depends(get_paper_manager)):
-    user_id, pdf_id = req.user_id, req.pdf_id
+    user_id = req.user_id
     summary_pdf_id = paper_manager.get_summary_pdf_id(user_id)
 
     if summary_pdf_id:
@@ -695,7 +685,7 @@ async def get_all_summary_info(info_type: InfoType,
         })
 
 
-def pdf2text_recognize(pdf, key="text"):
+def pdf2text_recognize(pdf):
     p2t = Pdf2Text(AI_CONFIG['layout_model_path'])
 
     pdf_images, lang = pdf_to_image(pdf)
@@ -705,9 +695,6 @@ def pdf2text_recognize(pdf, key="text"):
     del p2t
     torch.cuda.empty_cache()
     gc.collect()
-
-    if key == "summary":
-        return result
 
     sentences = [split_sentences(raw_text) for raw_text in result]
 
