@@ -1,14 +1,8 @@
 from google.cloud import texttospeech
-import base64
-from http import HTTPStatus  # For better HTTP status code handling
 from pydub import AudioSegment  # Import pydub for audio manipulation
 from tqdm import tqdm
 from utils.script import write_full_script
-import requests
 import io
-from config.config import VOICE_CONFIG
-import urllib.request
-import urllib.parse
 
 import sys
 import os

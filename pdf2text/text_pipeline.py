@@ -20,9 +20,6 @@ class Text_Extractor():
         return img
 
     def Recognize_Formula(self, img):
-        # self issue
-        # 이거 \ 하나만 나와야 하는데 \\로 나옴.
-        # 아마 후처리 해야할듯 나중에 ?
         return f'$${self.mfr.ocr(img)}$$'
 
     def Recognize_Text(self, img, lang):
@@ -66,7 +63,6 @@ class Text_Extractor():
             text_outs.append([[xmin, ymin, xmax, ymax], text])
 
         outs = [text for box, text in text_outs]
-        # print('원본: ' + ' '.join(outs))
 
         # 4. Text와 수식 같은 line으로 묶는 작업
         line = []

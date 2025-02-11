@@ -1,4 +1,3 @@
-import json
 from api.api_classes import ChatCompletionsExecutor
 from config.config import API_CONFIG
 
@@ -64,6 +63,7 @@ prompts = {
     """
 }
 
+
 def write_script_part(prompt_key, text_content, history=None):
     """
     Generate a part of the script based on the specified prompt.
@@ -73,7 +73,7 @@ def write_script_part(prompt_key, text_content, history=None):
         api_key=API_CONFIG["api_key"],
         request_id=API_CONFIG["request_id"],
     )
-    
+
     messages = [
         {"role": "system", "content": prompts[prompt_key]},
         {"role": "user", "content": text_content},
@@ -95,6 +95,7 @@ def write_script_part(prompt_key, text_content, history=None):
     response = chat_api.execute(request_data, stream=False)
     return response
 
+
 def write_full_script(text_content):
     """
     Generate the full script by combining all four parts.
@@ -107,7 +108,8 @@ def write_full_script(text_content):
 
     second_response = write_script_part("second_prompt", text_content, history)
     history.append({"role": "system", "content": prompts["second_prompt"]})
-    history.append({"role": "assistant", "content": second_response["message"]["content"]})
+    history.append(
+        {"role": "assistant", "content": second_response["message"]["content"]})
 
     third_response = write_script_part("third_prompt", text_content, history)
 
@@ -117,7 +119,7 @@ def write_full_script(text_content):
         + second_response["message"]["content"]
         + "\n\n"
         + third_response["message"]["content"]
-    )      
+    )
     # Parse the script into JSON format for TTS compatibility
     conversations = []
     lines = full_script.strip().split("\n")

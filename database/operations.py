@@ -5,7 +5,7 @@ from sentence_transformers import SentenceTransformer
 from hashlib import sha256
 from passlib.context import CryptContext
 from datetime import datetime
-from datebase.connection import DatabaseConnection
+from database.connection import DatabaseConnection
 import psycopg2
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -18,7 +18,7 @@ class BaseDBHandler:
 
     def __enter__(self):
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.conn:
             DatabaseConnection._pool.putconn(self.conn)
@@ -59,6 +59,7 @@ class BaseDBHandler:
             print(f"쿼리 {query} 실행 중 에러 발생: {str(e)}")
             self.conn.rollback()
             return
+
 
 class SessionManager:
     def __init__(self, connection):
@@ -146,9 +147,6 @@ class PaperManager(BaseDBHandler):
         # self.conn = connection
         super().__init__(connection)
 
-    # TODO lang 속성 추가후 초기 저장에는 null값으로
-    # TODO paper info 업데이트 하는 함수 필요
-    # TODO 업데이트 하는 함수를 통해서 lang값 추출 후 적용해야함.
     def store_paper_info(self, user_id: str, title: str, author: str = None,
                          pdf_file_path: str = None):
         query = """
@@ -194,7 +192,6 @@ class PaperManager(BaseDBHandler):
         result = self.execute_query_one(query, (user_id, paper_id))
 
         if result:
-            # TODO lang 속성 추가
             return {
                 'paper_id': result[0],
                 'user_id': result[1],
@@ -257,9 +254,10 @@ class DocumentUploader:
             cur.close()
 
 
-class ChatHistoryManager:
+class ChatHistoryManager(BaseDBHandler):
     def __init__(self, connection, embedding_api, chat_api):
-        self.conn = connection
+        # self.conn = connection
+        super().__init__(connection)
         self.embedding_api = embedding_api
         self.chat_api = chat_api
         self.cache = {}
@@ -273,29 +271,20 @@ class ChatHistoryManager:
     def store_chat(self, user_id, paper_id, role, message, parent_id=None,
                    is_summary=False, summary_for_chat_id=None, context_docs=None,
                    embedding=None, chat_type=None):
-        try:
-            cur = self.conn.cursor()
-
-            cur.execute("""
-                INSERT INTO public.chat_hist
-                (user_id, paper_id, role, message, parent_message_id,
-                 is_summary, summary_for_chat_id, context_docs,
-                 embedding, chat_type)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING chat_id
-            """, (user_id, paper_id, role, message, parent_id,
-                  is_summary, summary_for_chat_id, context_docs,
-                  embedding, chat_type))
-
-            chat_id = cur.fetchone()[0]
-            self.conn.commit()
-            return chat_id
-        except Exception as e:
-            self.conn.rollback()
-            print(f"채팅 로그 저장 중 에러 발생: {str(e)}")
-            raise
-        finally:
-            cur.close()
+        query = """
+            INSERT INTO public.chat_hist
+            (user_id, paper_id, role, message, parent_message_id,
+                is_summary, summary_for_chat_id, context_docs,
+                embedding, chat_type)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING chat_id
+        """
+        params = (user_id, paper_id, role, message, parent_id,
+                is_summary, summary_for_chat_id, context_docs,
+                embedding, chat_type)
+        
+        result = self.execute_query_one(query, params)
+        return result[0] if result else None
 
     def store_conversation(self, user_id, paper_id, user_message, llm_response,
                            parent_id=None, context_docs=None, embedding=None,
@@ -354,28 +343,21 @@ class ChatHistoryManager:
 
     def get_chat_history(self, user_id, paper_id, limit=None):
         """ 세션 히스토리 조회 """
-        try:
-            cur = self.conn.cursor()
+        query = """
+            SELECT chat_id, role, message, created_at, is_summary
+            FROM public.chat_hist
+            WHERE user_id = %s
+            AND paper_id = %s
+            ORDER BY created_at
+        """
+        params = (user_id, paper_id) if not limit else (user_id, paper_id, limit)
 
-            query = """
-                SELECT chat_id, role, message, created_at, is_summary
-                FROM public.chat_hist
-                WHERE user_id = %s
-                AND paper_id = %s
-                ORDER BY created_at
-            """
-            if limit:
-                query += " LIMIT %s "
-                cur.execute(query, (user_id, paper_id, limit))
-            else:
-                cur.execute(query, (user_id, paper_id))
+        if limit:
+            query += " LIMIT %s"
+        
+        result = self.execute_query(query, params)
 
-            return cur.fetchall()
-        except Exception as e:
-            print(f"대화 불러오기 중 에러 발생: {str(e)}")
-            raise
-        finally:
-            cur.close()
+        return result
 
     def find_related_conversations(self, current_question, user_id,
                                    paper_id, similarity_threshold=0.85):

@@ -2,13 +2,10 @@ import os
 import cv2
 import sys
 import torch
-import numpy as np
-from pathlib import Path
 
 # YOLOv7 관련 모듈 불러오기
 from pdf2text.yolov7.models.experimental import attempt_load
 from pdf2text.yolov7.utils.general import non_max_suppression, scale_coords
-from pdf2text.yolov7.utils.plots import plot_one_box
 from pdf2text.yolov7.utils.datasets import letterbox
 sys.path.append(os.path.join(os.path.dirname(__file__), 'yolov7'))
 
@@ -30,7 +27,7 @@ class Formula_Detect:
         img = img.unsqueeze(0).to(self.device)
         return img
 
-    # Detection을 수행하는 함수. (threshold로 임계값 설정 test필요.)
+    # Detection을 수행하는 함수
     def detect(self, img, conf_thres=0.3, iou_thres=0.3):
         # Store original image shape
         original_shape = img.shape[:2]  # (height, width)

@@ -1,10 +1,9 @@
 from storage import ObjectStorageManager
-from datebase import PaperManager, AdditionalFileUploader, DocumentUploader
+from database import PaperManager, AdditionalFileUploader, DocumentUploader
 from typing import Dict
 from dotenv import load_dotenv
-# from .model_manager import model_manager
 from .summary_short import abstractive_summarization
-from .timeline import extract_keywords, timeline_str, abstractive_timeline
+from .timeline import extract_keywords, abstractive_timeline
 from .script import write_full_script
 from .audiobook_test import script_to_speech
 from .vlm import conversation_with_images, translate_clova
@@ -15,9 +14,6 @@ import tempfile
 from PIL import Image
 import traceback
 load_dotenv()
-
-# TODO 이거 임시 파일 만들고 삭제하는 로직은 나중에 추가하기
-# save_files.py
 
 
 class FileManager:
@@ -40,7 +36,7 @@ class FileManager:
             file_path = file_input
         else:
             raise TypeError("file_input must be either bytes or str")
-    
+
         try:
             # Object Storage에 PDF 저장
             storage_info = self.storage_manager.upload_pdf(
@@ -294,7 +290,6 @@ class FileManager:
             print("Traceback:", traceback.format_exc())
             return False
 
-    # TODO Paper부터 다른 가져오는 기능 임시 파일 삭제하는거 만들기
     def get_paper(self, user_id: str, paper_id: int) -> str:
         """Storage에서 PDF 파일 가져오는 메서드"""
         try:

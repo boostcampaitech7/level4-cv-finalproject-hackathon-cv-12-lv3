@@ -2,7 +2,6 @@ import requests
 import time
 import json
 import re
-import os
 from mtranslate import translate
 from api.api_classes import ChatCompletionsExecutor
 from config.config import API_CONFIG
@@ -71,8 +70,6 @@ def timeline_str(query_list):
         time.sleep(1)
 
     return output_str
-
-
 
 
 def abstractive_timeline(user_input):
@@ -177,15 +174,10 @@ def abstractive_timeline(user_input):
         "responseFormat": "json"  # 🚀 JSON 강제 출력 설정
     }
     response = chat_api.execute(request_data, stream=False)
-    # full_prompt = f"{system_prompt}\n\n사용자 입력 키워드: {user_input}"
-    # # ✅ Gemini API 호출
-    # model = genai.GenerativeModel(model_name="gemini-pro",
-    # generation_config={"response_mime_type": "application/json"})  # JSON 모드 강제)  # 🔹 Gemini 모델 지정
-    # response = model.generate_content(full_prompt)
-    
+
     # JSON 문자열 추출
     response_text = response["message"]["content"]
-    
+
     print(response_text)
 
     try:
@@ -208,6 +200,7 @@ def abstractive_timeline(user_input):
         print(f"❌ JSON 변환 오류 발생: {e}")
 
     return parsed_json
+
 
 def extract_json(response_text):
     """

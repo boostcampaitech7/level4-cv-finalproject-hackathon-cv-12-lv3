@@ -3,28 +3,33 @@ from summarizer import Summarizer
 from transformers import AutoConfig, AutoTokenizer, AutoModel
 import torch
 
+
 class PaperSummarizer:
     def __init__(self):
-        self.custom_config = AutoConfig.from_pretrained('allenai/scibert_scivocab_uncased')
-        self.custom_config.output_hidden_states=True
-        self.custom_tokenizer = AutoTokenizer.from_pretrained('allenai/scibert_scivocab_uncased')
-        self.custom_model = AutoModel.from_pretrained('allenai/scibert_scivocab_uncased', config=self.custom_config)
-        
-        self.model = Summarizer(custom_model=self.custom_model, custom_tokenizer=self.custom_tokenizer)
-        
+        self.custom_config = AutoConfig.from_pretrained(
+            'allenai/scibert_scivocab_uncased')
+        self.custom_config.output_hidden_states = True
+        self.custom_tokenizer = AutoTokenizer.from_pretrained(
+            'allenai/scibert_scivocab_uncased')
+        self.custom_model = AutoModel.from_pretrained(
+            'allenai/scibert_scivocab_uncased', config=self.custom_config)
+
+        self.model = Summarizer(
+            custom_model=self.custom_model, custom_tokenizer=self.custom_tokenizer)
+
     def clean_up(self):
         try:
             if hasattr(self, 'custom_model'):
                 del self.custom_model
             if hasattr(self, 'model'):
                 del self.model
-            
+
             if 'torch' in globals() and torch is not None:
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
         except:
             pass
-    
+
     # 자동 메모리 정리
     def __del__(self):
         self.clean_up()
@@ -60,17 +65,17 @@ class PaperSummarizer:
             for page in page_list:
                 page_label = page['page_label']
                 content = page['content']
-                
+
                 if page_label not in label_summaries:
                     label_summaries[page_label] = ""
-                
+
                 summary = self.model(content, num_sentences=10)
                 label_summaries[page_label] += summary + " "
 
             # 최종 요약 생성
             combined_summary = " ".join(label_summaries.values())
             final_summary = self.model(combined_summary, num_sentences=30)
-            
+
             return final_summary
 
         except Exception as e:

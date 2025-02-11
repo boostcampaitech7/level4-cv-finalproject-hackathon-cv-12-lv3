@@ -34,7 +34,6 @@ class Pdf2Text(object):
             img = image.convert('RGB')
 
         layout_output, _ = self.layout_analysis.parse(img)
-        # NOTE fitz에서 제공하는 page_id or page_number를 추가?
         final_outputs, caption_outputs = [], []
         table_figure_outputs = []
         for idx, layout_ele in enumerate(layout_output):
@@ -85,36 +84,21 @@ class Pdf2Text(object):
                     'type': "Table",
                     'image': crop_img
                 })
-                # final_outputs.append(self.table_ocr.ocr(crop_img))
 
             elif ele_type == ElementType.FIGURE:
-                # NOTE 이미지의 경우에는 어떤 방식으로 처리할지 결정되면 진행
                 new_bbox = expand_bbox_with_original(img, bbox, 10, 10)
+                crop_img = img.crop(new_bbox)
                 table_figure_outputs.append({
-                    'obj': new_bbox,
-                    'bbox': bbox,
+                    'obj': crop_img,
+                    'bbox': new_bbox,
                     'type': "Figure",
-                    'image': new_bbox
+                    'image': crop_img
                 })
             else:  # 나머지 타입은 처리하지않는 유형이므로 무시
                 pass
 
-        # unmatch_res -> dict
-        # 'caption' : 매칭되지 않은 caption , 'obj' : 매칭되지 않은 Figure or Table
-        # 하위 속성 'item' : text or obj, 'bbox' : bbox 값, 'type' : 해당 객체의 type
-
-        # match_res
-        # 'figure' : 매칭된 Figure와 caption, 'table' : 매칭된 Table과 caption
-        # 하위 속성
-        # "caption_number": caption_number,
-        # 'obj': obj,
-        # 'obj_bbox': obj_bbox,
-        # 'caption_bbox': caption_bbox,
-        # 'caption_text': caption_text
         match_res, unmatch_res = matching_captioning(
             caption_outputs, table_figure_outputs)
-
-        # TODO 분리해낸 Table, Figure를 어떤 방식으로 제공할 것인가?
 
         return " ".join(final_outputs), match_res, unmatch_res
 

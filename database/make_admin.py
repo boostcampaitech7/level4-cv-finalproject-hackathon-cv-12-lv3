@@ -26,7 +26,7 @@ try:
         "username": "관리자",
         "birth": date.today()
     }
-    
+
     if not user_manager.user_exists(admin_info["user_id"]):
         success = user_manager.create_user(
             admin_info["user_id"],

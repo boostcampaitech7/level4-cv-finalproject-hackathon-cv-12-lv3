@@ -87,7 +87,7 @@ def llm_refine(query, completion_executor):
         'seed': 0
     }
 
-    llm_response = completion_executor.execute(request_data,stream=False)
+    llm_response = completion_executor.execute(request_data, stream=False)
     enhanced_query = extract_enhanced_query(llm_response)
 
     return enhanced_query

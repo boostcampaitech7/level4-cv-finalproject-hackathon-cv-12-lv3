@@ -489,20 +489,9 @@ def extract_cells_from_structure(table_structure):
         cell_rect = col_rect.intersect(row_rect)
         cell['bbox'] = list(cell_rect)
 
-    # span_nums_by_cell, _, _ = slot_into_containers(
-    #     cells,
-    #     tokens,
-    #     overlap_threshold=0.001,
-    #     unique_assignment=True,
-    #     forced_assignment=False,
-    # )
     span_nums_by_cell = [[] for _ in range(len(cells))]
 
-    for cell, cell_span_nums in zip(cells, span_nums_by_cell):
-        # cell_spans = [tokens[num] for num in cell_span_nums]
-        # cell['cell text'] = extract_text_from_spans(
-        #     cell_spans, remove_integer_superscripts=False
-        # )
+    for cell, _ in zip(cells, span_nums_by_cell):
         cell['spans'] = ""
 
     rows = sorted(rows, key=lambda x: x['bbox'][0] + x['bbox'][2])

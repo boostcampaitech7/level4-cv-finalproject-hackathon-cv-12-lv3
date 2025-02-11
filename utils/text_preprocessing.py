@@ -1,5 +1,6 @@
 import re
 
+
 def clean_text(text):
     """
     추출받은 텍스트를 정제하는 함수
