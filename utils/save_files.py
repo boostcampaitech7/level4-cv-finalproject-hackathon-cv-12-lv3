@@ -1,5 +1,5 @@
 from storage import ObjectStorageManager
-from datebase import PaperManager, AdditionalFileUploader, DocumentUploader
+from database import PaperManager, AdditionalFileUploader, DocumentUploader
 from typing import Dict
 from dotenv import load_dotenv
 # from .model_manager import model_manager
@@ -40,7 +40,7 @@ class FileManager:
             file_path = file_input
         else:
             raise TypeError("file_input must be either bytes or str")
-    
+
         try:
             # Object Storage에 PDF 저장
             storage_info = self.storage_manager.upload_pdf(

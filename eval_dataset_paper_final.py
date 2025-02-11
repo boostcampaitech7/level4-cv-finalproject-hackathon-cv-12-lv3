@@ -3,7 +3,7 @@ from config.config import API_CONFIG, AI_CONFIG
 from utils import chunkify_to_num_token, MultiChatManager
 from utils import process_query_with_reranking_compare, split_sentences
 from api import EmbeddingAPI, ChatCompletionsExecutor
-from datebase import DatabaseConnection, DocumentUploader, SessionManager
+from database import DatabaseConnection, DocumentUploader, SessionManager
 from sentence_transformers import SentenceTransformer, CrossEncoder
 from pdf2text import Pdf2Text, pdf_to_image
 import os

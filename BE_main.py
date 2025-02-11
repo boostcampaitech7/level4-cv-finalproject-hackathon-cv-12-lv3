@@ -24,8 +24,8 @@ from utils import split_sentences, chunkify_to_num_token
 from utils import process_query_with_reranking_compare, query_and_respond
 from api import EmbeddingAPI, ChatCompletionsExecutor, SummarizationExecutor
 
-from datebase.connection import DatabaseConnection
-from datebase.operations import PaperManager, DocumentUploader, ChatHistoryManager, AdditionalFileUploader
+from database.connection import DatabaseConnection
+from database.operations import PaperManager, DocumentUploader, ChatHistoryManager, AdditionalFileUploader
 
 from sentence_transformers import SentenceTransformer, CrossEncoder
 

@@ -4,7 +4,7 @@ from config.config import API_CONFIG, AI_CONFIG
 from utils import MultiChatManager, chunkify_to_num_token, conversation_with_images
 from utils import process_query_with_reranking_compare, split_sentences, conversation_with_images
 from api import EmbeddingAPI, ChatCompletionsExecutor
-from datebase import DatabaseConnection, DocumentUploader, SessionManager
+from database import DatabaseConnection, DocumentUploader, SessionManager
 from sentence_transformers import SentenceTransformer, CrossEncoder
 import os
 import csv

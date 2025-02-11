@@ -5,7 +5,7 @@ from sentence_transformers import SentenceTransformer
 from hashlib import sha256
 from passlib.context import CryptContext
 from datetime import datetime
-from datebase.connection import DatabaseConnection
+from database.connection import DatabaseConnection
 import psycopg2
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -18,7 +18,7 @@ class BaseDBHandler:
 
     def __enter__(self):
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.conn:
             DatabaseConnection._pool.putconn(self.conn)
@@ -59,6 +59,7 @@ class BaseDBHandler:
             print(f"쿼리 {query} 실행 중 에러 발생: {str(e)}")
             self.conn.rollback()
             return
+
 
 class SessionManager:
     def __init__(self, connection):
