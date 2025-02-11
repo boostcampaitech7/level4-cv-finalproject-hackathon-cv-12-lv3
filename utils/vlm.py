@@ -1,19 +1,17 @@
 import torch
 from transformers import AutoModelForCausalLM
-from model.deepseek_vl.models import VLChatProcessor, MultiModalityCausalLM
-from model.deepseek_vl.utils.io import load_pil_images
-from PIL import Image
+from model.deepseek_vl.models import VLChatProcessor
 
 torch.backends.cuda.enable_mem_efficient_sdp(False)
 torch.backends.cuda.enable_flash_sdp(False)
 
 
-def conversation_with_images(model_path, images, image_description=None, 
+def conversation_with_images(model_path, images, image_description=None,
                              conversation=None, max_new_tokens=512,
                              timeout=300):
     """
     A function to process conversations with images using the DeepSeek VL model.
-    
+
     Args:
         model_path (str): Path to the pre-trained model.
         image_paths (list): List of image file paths (str) to be processed.
@@ -21,13 +19,13 @@ def conversation_with_images(model_path, images, image_description=None,
         conversation (list, optional): List of conversation dicts, including the user message with image placeholders. 
                                         If None, a default conversation is used.
         max_new_tokens (int): Maximum number of tokens to generate in the response.
-        
+
     Returns:
         str: Generated response from the assistant.
     """
     if not isinstance(images, list):
         images = [images]
-        
+
     # Set default conversation if not provided
     if conversation is None:
         conversation = [
@@ -38,12 +36,13 @@ def conversation_with_images(model_path, images, image_description=None,
             },
             {"role": "Assistant", "content": ""},
         ]
-    
+
     # Load the pre-trained model and processor
     vl_chat_processor = VLChatProcessor.from_pretrained(model_path)
     tokenizer = vl_chat_processor.tokenizer
-    vl_gpt = AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True)
-    
+    vl_gpt = AutoModelForCausalLM.from_pretrained(
+        model_path, trust_remote_code=True)
+
     # Move the model to GPU with bfloat16 precision
     vl_gpt = vl_gpt.to(torch.bfloat16).cuda().eval()
 
@@ -71,15 +70,16 @@ def conversation_with_images(model_path, images, image_description=None,
     )
 
     # Decode the generated response
-    answer = tokenizer.decode(outputs[0].cpu().tolist(), skip_special_tokens=True)
-    
+    answer = tokenizer.decode(
+        outputs[0].cpu().tolist(), skip_special_tokens=True)
+
     return f"{prepare_inputs['sft_format'][0]} {answer}"
 
 
 def translate_clova(description, completion_executor):
     messages1 = [
         {
-            "role": "system", 
+            "role": "system",
             "content": f"""
             다음은 문서PDF에 들어가는 이미지입니다.
             이미지를 설명하는 문장을 주어진 그대로 자연스럽고 자세하고 더 풍부하게 변환해 주세요. 
@@ -97,7 +97,7 @@ def translate_clova(description, completion_executor):
             """
         }
     ]
-  
+
     request_data1 = {
         'messages': messages1,
         'topP': 0.8,
@@ -111,13 +111,13 @@ def translate_clova(description, completion_executor):
     }
 
     res1 = completion_executor.execute(request_data1, stream=False)
-    
+
     res1 = res1['message']['content']
-    
+
     return res1
 
 
-#### 사용법
+# 사용법
 
 # images = ["/data/ephemeral/home/lexxsh/level4-cv-finalproject-hackathon-cv-12-lv3/img/page_4_img_2.png"]
 # caption = "This is Transformer Acheitecture img"

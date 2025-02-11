@@ -1,3 +1,4 @@
+from config.config import GOOGLE_SCHOLAR_API_KEY
 import requests
 import os
 import json
@@ -5,7 +6,7 @@ import re
 import sys
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(current_dir, ".."))
-from config.config import GOOGLE_SCHOLAR_API_KEY
+
 
 def get_cited_by_papers(query, topk=5):
     api_key = GOOGLE_SCHOLAR_API_KEY  # SearchApi API 키 설정
@@ -25,7 +26,8 @@ def get_cited_by_papers(query, topk=5):
     results = response.json()
 
     if response.status_code != 200:
-        print(f"Error (Target Paper Search): {results.get('error', 'Unknown error')}")
+        print(
+            f"Error (Target Paper Search): {results.get('error', 'Unknown error')}")
         return None
 
     if "organic_results" not in results or not results["organic_results"]:
@@ -57,13 +59,15 @@ def get_cited_by_papers(query, topk=5):
     cited_by_results = cited_by_response.json()
 
     if cited_by_response.status_code != 200:
-        print(f"Error (Cited By Search): {cited_by_results.get('error', 'Unknown error')}")
+        print(
+            f"Error (Cited By Search): {cited_by_results.get('error', 'Unknown error')}")
         return None
     elif "organic_results" in cited_by_results:
         return sorted(cited_by_results["organic_results"], key=lambda x: int(x.get("inline_links", {}).get("cited_by", {}).get("total", 0)), reverse=True)[:topk]
     else:
         print("No cited by results found.")
         return None
+
 
 if __name__ == "__main__":
     target_paper_query = "Attention is all you need"  # 타겟 논문 검색어
@@ -74,7 +78,8 @@ if __name__ == "__main__":
         print("\n타겟 논문을 인용한 논문 상위 5개:")
         for paper in cited_by_papers:
             title = paper.get('title')
-            cited_by_count = paper.get('inline_links', {}).get('cited_by', {}).get('total', 0)
+            cited_by_count = paper.get('inline_links', {}).get(
+                'cited_by', {}).get('total', 0)
             print(f"- {title}: {cited_by_count}회 인용")
         # JSON 파일로 저장
         with open("related_works.json", "w", encoding="utf-8") as json_file:

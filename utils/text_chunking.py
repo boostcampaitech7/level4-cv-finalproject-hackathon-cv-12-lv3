@@ -1,9 +1,10 @@
-import tiktoken, re
+import tiktoken
+import re
 from typing import List
 from sentence_transformers import util
 import numpy as np
 import torch
-from sentence_transformers import SentenceTransformer
+
 
 def num_tokens(text: str) -> int:
     """
@@ -15,10 +16,11 @@ def num_tokens(text: str) -> int:
     tokenizer = tiktoken.get_encoding("cl100k_base")
     return len(tokenizer.encode(text))
 
+
 def chunkify_with_overlap(sentences: List[str], chunk_size: int = 256, overlap_size: int = 50) -> List[str]:
     """
     문장 리스트를 토큰 수 기준으로 분할 (겹침 포함, 문장 단위 보장)
-    
+
     :param sentences: 문장 리스트 (예: ["문장1", "문장2", ...])
     :param chunk_size: 최대 청크 토큰 수
     :param overlap_size: 겹칠 토큰 수
@@ -68,7 +70,8 @@ def chunkify_with_overlap(sentences: List[str], chunk_size: int = 256, overlap_s
 
     return chunks
 
-def chunkify_to_num_token(sentences, chunk_size = 256):
+
+def chunkify_to_num_token(sentences, chunk_size=256):
     """
     텍스트를 토큰 수 기준으로 분할하는 함수 (중복 방지)
     :param text: 입력 텍스트
@@ -115,84 +118,59 @@ def chunkify_to_num_token(sentences, chunk_size = 256):
         chunks.append(current_chunk.strip())
     return chunks
 
+
 def group_academic_paragraphs(sentences, model, max_sentences=5, similarity_threshold=0.4, window_size=3):
-    # sentences = split_into_sentences(sentences)
-    
     # 임베딩을 한 번만 계산
     embeddings = model.encode(sentences, convert_to_tensor=True)
-    
+
     groups = []
     current_group = [sentences[0]]
     current_avg_embedding = embeddings[0]
-    
+
     for i in range(1, len(sentences)):
         window_start = max(0, i - window_size)
         window_embeddings = embeddings[window_start:i]
         window_avg = torch.mean(window_embeddings, dim=0)
-        
-        context_similarity = util.pytorch_cos_sim(window_avg, embeddings[i]).item()
-        direct_similarity = util.pytorch_cos_sim(embeddings[i-1], embeddings[i]).item()
-        
+
+        context_similarity = util.pytorch_cos_sim(
+            window_avg, embeddings[i]).item()
+        direct_similarity = util.pytorch_cos_sim(
+            embeddings[i-1], embeddings[i]).item()
+
         weighted_similarity = 0.7 * context_similarity + 0.3 * direct_similarity
-        
+
         if weighted_similarity >= similarity_threshold and len(current_group) < max_sentences:
             current_group.append(sentences[i])
-            current_avg_embedding = torch.mean(embeddings[len(current_group)-window_size:len(current_group)], dim=0)
+            current_avg_embedding = torch.mean(
+                embeddings[len(current_group)-window_size:len(current_group)], dim=0)
         else:
             # 현재 그룹을 최종 그룹에 추가
             groups.append(current_group)
             # 새 그룹 시작
             current_group = [sentences[i]]
-    
+
     # 마지막 그룹 처리
     if current_group:
         groups.append(current_group)
-    
+
     # 모든 그룹을 max_sentences 기준으로 재분할
     final_groups = []
     for group in groups:
         # 그룹을 max_sentences 크기의 서브그룹으로 분할
         for i in range(0, len(group), max_sentences):
             final_groups.append(group[i:i+max_sentences])
-    
+
     for i in range(1, len(final_groups)):  # 첫 번째 문단은 제외하고 시작
         if len(final_groups[i]) <= 2:
             # 이전 문단과 합치기
             final_groups[i-1].extend(final_groups[i])
             final_groups[i] = []
-    
+
     # 빈 리스트 제거
     final_groups = [group for group in final_groups if group]
 
     return final_groups
-# def semantic_chunking(sentences, sentence_embeddings, threshold=0.7):
-#     chunks = []
-#     chunk_embeddings = []
-#     current_chunk = []
-#     current_embeddings = []
-    
-#     for i in range(len(sentences) - 1):
-#         # 현재 문장과 다음 문장의 유사도 계산
-#         similarity = util.cos_sim(sentence_embeddings[i], sentence_embeddings[i + 1])
-        
-#         if similarity > threshold:
-#             current_chunk.append(sentences[i])
-#             current_embeddings.append(sentence_embeddings[i])
-#         else:
-#             current_chunk.append(sentences[i])
-#             current_embeddings.append(sentence_embeddings[i])
-            
-#             # 청크 텍스트와 임베딩 저장
-#             chunks.append(". ".join(current_chunk))
-#             chunk_embeddings.append(np.mean(current_embeddings, axis=0).tolist())  # 임베딩 평균
-#             current_chunk = []
-#             current_embeddings = []
-    
-#     if current_chunk:
-#         chunks.append(". ".join(current_chunk))
-#         chunk_embeddings.append(np.mean(current_embeddings, axis=0).tolist())
-    
-#     return chunks, chunk_embeddings
+
 
 def semantic_chunking(sentences, sentence_embeddings, threshold=0.7, target_chunk_size=None, dynamic_threshold_increment=0.1):
     # Preprocess to identify special content (figures, tables, equations)
@@ -200,30 +178,32 @@ def semantic_chunking(sentences, sentence_embeddings, threshold=0.7, target_chun
     for idx, sentence in enumerate(sentences):
         if has_special_content(sentence):
             special_indices.add(idx)
-    
+
     chunks = []
     chunk_embeddings = []
     current_chunk = []
     current_embeddings = []
-    
+
     for i in range(len(sentences) - 1):
         current_sentence = sentences[i]
         next_sentence = sentences[i+1]
-        
+
         # Calculate original similarity
-        similarity = util.cos_sim(sentence_embeddings[i], sentence_embeddings[i+1]).item()
-        
+        similarity = util.cos_sim(
+            sentence_embeddings[i], sentence_embeddings[i+1]).item()
+
         # Dynamic threshold adjustment for chunk size control
         adjusted_threshold = threshold
         if target_chunk_size:
             projected_size = len(current_chunk) + 1  # +1 for current_sentence
             if projected_size >= target_chunk_size:
                 adjusted_threshold += dynamic_threshold_increment
-        
+
         # Special content handling (lower threshold to keep context together)
         if i in special_indices or (i+1) in special_indices:
-            adjusted_threshold = max(threshold - 0.2, 0.2)  # Lower threshold for special content
-        
+            # Lower threshold for special content
+            adjusted_threshold = max(threshold - 0.2, 0.2)
+
         if similarity > adjusted_threshold:
             current_chunk.append(current_sentence)
             current_embeddings.append(sentence_embeddings[i])
@@ -231,10 +211,11 @@ def semantic_chunking(sentences, sentence_embeddings, threshold=0.7, target_chun
             current_chunk.append(current_sentence)
             current_embeddings.append(sentence_embeddings[i])
             chunks.append(". ".join(current_chunk))
-            chunk_embeddings.append(np.mean(current_embeddings, axis=0).tolist())
+            chunk_embeddings.append(
+                np.mean(current_embeddings, axis=0).tolist())
             current_chunk = []
             current_embeddings = []
-    
+
     # Handle last sentence and remaining content
     if current_chunk:
         current_chunk.append(sentences[-1])
@@ -244,14 +225,15 @@ def semantic_chunking(sentences, sentence_embeddings, threshold=0.7, target_chun
     elif len(sentences) > 0 and len(current_chunk) > 0:
         chunks.append(sentences[-1])
         chunk_embeddings.append(sentence_embeddings[-1].tolist())
-    
+
     return chunks, chunk_embeddings
+
 
 def has_special_content(sentence):
     """
     마크다운 형식으로 표시된 수식, 표, 테이블이 포함되어 있는지 확인하는 함수.
     """
-    
+
     # ✅ 마크다운 및 LaTeX 스타일 수식 탐지
     latex_pattern = r'(\$\$.*?\$\$)|(\$.*?\$)|\\\(|\\\)|\\begin{.*?}|\\end{.*?}|\\mathrm{.*?}|\\mathbf{.*?}'
     if re.search(latex_pattern, sentence, re.DOTALL):  # re.DOTALL: 여러 줄 수식도 탐지 가능
@@ -261,7 +243,7 @@ def has_special_content(sentence):
     table_pattern = r'^\|(.+?)\|$'
     if re.search(table_pattern, sentence.strip()):
         return True
-    
+
     # ✅ 'figure' 또는 'table' 포함 여부 확인 (대소문자 무시)
     if 'figure' in sentence.lower() or 'table' in sentence.lower():
         return True
