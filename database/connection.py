@@ -2,10 +2,10 @@ import os
 from dotenv import load_dotenv
 import psycopg2
 from psycopg2 import pool
-from psycopg2.extras import RealDictCursor
-from psycopg2.extensions import connection, cursor
+from psycopg2.extensions import connection
 
 load_dotenv()
+
 
 class DatabaseConnection:
     _pool = None
@@ -39,7 +39,7 @@ class DatabaseConnection:
 
     def connect(self):
         try:
-            if self.conn is None or (hasattr(self.conn, 'closed') 
+            if self.conn is None or (hasattr(self.conn, 'closed')
                                      and self.conn.closed):
                 self.conn = DatabaseConnection._pool.getconn()
             if self.conn is None:
@@ -59,7 +59,7 @@ class DatabaseConnection:
         if self.conn and not self.conn.closed:
             DatabaseConnection._pool.putconn(self.conn)
         return self.connect()
-    
+
     def close(self):
         if self.conn:
             # DatabaseConnection._pool.putconn(self.conn)
@@ -70,6 +70,7 @@ class DatabaseConnection:
     def close_all(cls):
         if cls._pool:
             cls._pool.closeall()
+
 
 def get_db_connection() -> connection:
     db_connection = DatabaseConnection()
