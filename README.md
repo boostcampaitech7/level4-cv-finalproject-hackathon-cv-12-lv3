@@ -68,8 +68,6 @@
 
 ## Service Architecture
 
-우선 논문 PDF 파일을 업로드하여 텍스트 및 이미지 데이터를 추출합니다. 벡터 데이터베이스에서는 추출된 데이터를 벡터 형태로 저장하고, 사용자 질의와 유사한 벡터를 검색합니다.
-
 <div align="center">
     <picture>
         <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/24ba6392-8544-4bbc-a4c3-da27922361ab">
@@ -78,20 +76,22 @@
     </picture>
 </div>
 
+우선 논문 PDF 파일을 업로드하여 텍스트 및 이미지 데이터를 추출합니다. 벡터 데이터베이스에서는 추출된 데이터를 벡터 형태로 저장하고, 사용자 질의와 유사한 벡터를 검색합니다.
+
+<br>
+
+[![Main Page 시연 영상](https://github.com/user-attachments/assets/d11bdc0c-789d-4577-894c-45e91cf6acd8)](https://youtu.be/bYKZcrlty_E)
 챗봇 인터페이스를 통해 사용자는 논문에 대한 질문을 하고, Vector DB에서 검색된 답변을 제공받습니다. 추가로, AI 모델의 답변에 대한 안전성 검사를 통해 부적절한 답변을 필터링합니다.
 
-![유튜브 링크]()
-<img width="1147" alt="image" src="https://github.com/user-attachments/assets/d11bdc0c-789d-4577-894c-45e91cf6acd8" />
+<br>
 
+[![Summary Page 시연 영상](https://github.com/user-attachments/assets/1c330dd1-457c-46cf-83cf-741a6509557f)](https://youtu.be/YGoFEJb3DwQ)
 요약 페이지에서는 논문 요약 정보, 연구 분야, 방법론, 결과 등을 제공하고, 유사 논문을 추천합니다.
 
-![유튜브 링크]()
-<img width="982" alt="image" src="https://github.com/user-attachments/assets/1c330dd1-457c-46cf-83cf-741a6509557f" />
+<br>
 
+[![Audio Page 시연 영상](https://github.com/user-attachments/assets/bccbbd56-4953-4638-8564-cdf0fde5064a)](https://youtu.be/O7F5wzoCZag)
 오디오 페이지에서는 논문 내용을 요약한 오디오 콘텐츠와 스크립트 텍스트를 제공합니다.
-
-![유튜브 링크]()
-<img width="1023" alt="image" src="https://github.com/user-attachments/assets/bccbbd56-4953-4638-8564-cdf0fde5064a" />
 
 <br/>
 
@@ -141,7 +141,7 @@
 
 ## Result
 
-![시연 영상.gif]()
+[![전체 시연영상](https://github.com/user-attachments/assets/9855951e-c19a-4afd-8d7e-dfb7ea671f46)](https://youtu.be/fq43BjR9tas)
 
 <br/>
 
@@ -220,6 +220,6 @@ pip install -r requirements.txt
 
 [발표자료]()
 
-[발표영상]()
+[발표영상 ]()
 
 <br/>
