@@ -246,12 +246,12 @@ pip install -r requirements.txt
 
 ## Refernece
 
-[노션]()
+[Notion](https://www.notion.so/SummarAI-17e9d71d841180019e4fec63ed0e5ef7?pvs=4)
 
-[랩업리포트]()
+[Wrap-UP Report](https://drive.google.com/file/d/1EWkmIMJUIt7Us3AV0ApPt7SP2SLispn0/view?usp=sharing)
 
-[발표자료]()
+[발표 자료](https://docs.google.com/presentation/d/18uIdExpUtLEqidLbUk1QPIW2W_cHzowYZvR8cgwd1Xk/edit?usp=sharing)
 
-[발표영상 ]()
+[발표영상]()
 
 <br/>
