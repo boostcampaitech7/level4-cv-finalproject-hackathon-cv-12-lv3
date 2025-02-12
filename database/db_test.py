@@ -1,10 +1,10 @@
 import os
 from dotenv import load_dotenv
 import psycopg2
-from psycopg2.extras import RealDictCursor
-from psycopg2.extensions import connection, cursor
+from psycopg2.extensions import connection
 
 load_dotenv()
+
 
 def get_db_connection() -> connection:
     try:
@@ -21,6 +21,7 @@ def get_db_connection() -> connection:
         print(f"Error connecting to database by oper: {e}")
     except Exception as e:
         print(f"Error connecting to database: {e}")
+
 
 def test_connection():
     try:
@@ -42,6 +43,7 @@ def test_connection():
         conn.close()
     except Exception as e:
         print(f"연결 실패. 에러 상세: {str(e)}")
+
 
 if __name__ == '__main__':
     try:

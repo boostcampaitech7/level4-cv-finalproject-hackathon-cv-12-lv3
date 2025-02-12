@@ -1,67 +1,60 @@
-import pytextrank
-import spacy
-import requests
-import networkx as nx
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.decomposition import TruncatedSVD
-import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-import re
-import sys
-import os
-sys.path.insert(0, os.path.abspath('/Users/haneol/Documents/Coding/level4-cv-finalproject-hackathon-cv-12-lv3/'))
-# from api.api_classes import ChatCompletionAPI
-from config.config import API_CONFIG
-import tiktoken
+# import os
+# import sys
+# import networkx as nx
 
-model = SentenceTransformer("dragonkue/bge-m3-ko")
+# from sentence_transformers import SentenceTransformer
+# from sklearn.metrics.pairwise import cosine_similarity
+# sys.path.insert(0, os.path.abspath(
+#     '/Users/haneol/Documents/Coding/level4-cv-finalproject-hackathon-cv-12-lv3/'))
 
-def extractive_summarization(sentences, sentence_embeddings=None, model=model, top_n=3):
-    """
-    문서의 문장들을 요약하는 함수 (추출적 요약)
-    TextRank만 사용하여 상위 n개의 문장 추출
-    이미 임베딩이 제공되면 이를 활용하고, 그렇지 않으면 내부에서 임베딩을 계산함
-    """
-    
-    # 문장 임베딩과 TextRank 점수 계산
-    def calculate_textrank(similarity_matrix):
-        graph = nx.from_numpy_array(similarity_matrix)
-        scores = nx.pagerank(graph)
-        return scores
+# model = SentenceTransformer("dragonkue/bge-m3-ko")
 
-    def calculate_combined_scores(sentences, sentence_embeddings):
-        # 문장 간 유사도 계산 (임베딩 벡터 간 코사인 유사도)
-        similarity_matrix = cosine_similarity(sentence_embeddings)
 
-        # TextRank 적용하여 문장 중요도 점수 계산
-        textrank_scores = calculate_textrank(similarity_matrix)
+# def extractive_summarization(sentences, sentence_embeddings=None, model=model, top_n=3):
+#     """
+#     문서의 문장들을 요약하는 함수 (추출적 요약)
+#     TextRank만 사용하여 상위 n개의 문장 추출
+#     이미 임베딩이 제공되면 이를 활용하고, 그렇지 않으면 내부에서 임베딩을 계산함
+#     """
 
-        return textrank_scores
+#     # 문장 임베딩과 TextRank 점수 계산
+#     def calculate_textrank(similarity_matrix):
+#         graph = nx.from_numpy_array(similarity_matrix)
+#         scores = nx.pagerank(graph)
+#         return scores
 
-    def extract_top_sentences(scores, sentences, n=3):
-        sorted_sentences = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-        return [sentences[i[0]] for i in sorted_sentences[:n]]
+#     def calculate_combined_scores(sentences, sentence_embeddings):
+#         # 문장 간 유사도 계산 (임베딩 벡터 간 코사인 유사도)
+#         similarity_matrix = cosine_similarity(sentence_embeddings)
 
-    # 임베딩이 주어진 경우, 임베딩을 사용하고 그렇지 않으면 새로 계산
-    if sentence_embeddings is None:
-        sentence_embeddings = model.encode(sentences)
+#         # TextRank 적용하여 문장 중요도 점수 계산
+#         textrank_scores = calculate_textrank(similarity_matrix)
 
-    # TextRank 점수 계산
-    textrank_scores = calculate_combined_scores(sentences, sentence_embeddings)
-    
-    # 상위 n개의 문장 추출
-    top_sentences = extract_top_sentences(textrank_scores, sentences, n=top_n)
-    
-    return top_sentences
+#         return textrank_scores
 
+#     def extract_top_sentences(scores, sentences, n=3):
+#         sorted_sentences = sorted(
+#             scores.items(), key=lambda x: x[1], reverse=True)
+#         return [sentences[i[0]] for i in sorted_sentences[:n]]
+
+#     # 임베딩이 주어진 경우, 임베딩을 사용하고 그렇지 않으면 새로 계산
+#     if sentence_embeddings is None:
+#         sentence_embeddings = model.encode(sentences)
+
+#     # TextRank 점수 계산
+#     textrank_scores = calculate_combined_scores(sentences, sentence_embeddings)
+
+#     # 상위 n개의 문장 추출
+#     top_sentences = extract_top_sentences(textrank_scores, sentences, n=top_n)
+
+#     return top_sentences
 
 
 def abstractive_summarization(extracted_sentences, completion_executor):
 
     messages1 = [
-                {"role": "system", "content": 
-            """
+        {"role": "system", "content":
+                 """
            당신은 학술 논문 요약 전문가로, 아래 구조에 따라 2000토큰 이상의 상세한 분석을 생성해야 합니다. 제공된 내용뿐만 아니라 가지고 있는 지식 모두를 활용하여 작성해주세요.
 
             [요구사항]
@@ -70,7 +63,7 @@ def abstractive_summarization(extracted_sentences, completion_executor):
             - 학문적 기여: 이론적 확장성 또는 새로운 연구 패러다임 제시
             - 실용적 가치: 실제 적용 사례 및 산업계 파급효과
             - 비교 분석: 기존 연구 대비 우월성 (정량적 지표 제시)
-            - 중요 태그: 논문을 기반으로한 중요키워드로 태그를 생성
+            - 중요 태그: 논문을 기반으로한 중요 키워드로 태그를 반드시 영어로 생성
 
             [작성 원칙]
             - 다층적 구조: 메타 인지적 관점에서 개념 > 방법 > 결과 > 영향력 계층화
@@ -87,14 +80,14 @@ def abstractive_summarization(extracted_sentences, completion_executor):
 
             비교 분석에서는 PPO(Proximal Policy Optimization), SAC(Soft Actor-Critic), TD3(Twin Delayed DDPG) 등 5가지 최신 강화학습 알고리즘과의 엄격한 비교 실험을 진행했습니다. 복잡한 작업 환경에서의 평균 보상(Reward)이 기존 대비 **18.7% 증가**했으며(그림 8), 학습 시간 또한 **30% 단축**되었습니다(표 7). 이러한 결과는 제안 모델이 효율성과 성능 면에서 우수함을 입증합니다.
             
-            중요 태그: #Deep Reinforcement Learning, #Robot Control, #Hierarchical Reinforcement Learning, #Meta-Reinforcement Learning, #Multi-Timescale Learning
+            Keywords: #Deep Reinforcement Learning, #Robot Control, #Hierarchical Reinforcement Learning, #Meta-Reinforcement Learning, #Multi-Timescale Learning
             """
-        },
+         },
         {"role": "user", "content": extracted_sentences}
     ]
     messages2 = [
-                {"role": "system", "content": 
-            """
+        {"role": "system", "content":
+                 """
           당신은 학술 논문 요약 전문가로, 아래 구조에 따라 1000토큰 이상의 상세한 분석을 생성해야 합니다. 제공된 내용뿐만 아니라 가지고 있는 지식 모두를 활용하여 작성해주세요.
 
            [요구사항]
@@ -137,7 +130,7 @@ def abstractive_summarization(extracted_sentences, completion_executor):
                 - 금융: 보고서 자동 생성 및 고객 응대 자동화
                 - 건강 관리: 의학 논문 요약 및 환자 기록 분석
             """
-        },
+         },
         {"role": "user", "content": extracted_sentences}
     ]
     request_data1 = {
@@ -162,25 +155,9 @@ def abstractive_summarization(extracted_sentences, completion_executor):
         'includeAiFilters': True,
         'seed': 0
     }
-    res1 = completion_executor.execute(request_data1,stream=False)
-    res2 = completion_executor.execute(request_data2,stream=False)
-    
+    res1 = completion_executor.execute(request_data1, stream=False)
+    res2 = completion_executor.execute(request_data2, stream=False)
+
     res1 = res1['message']['content']
     res2 = res2['message']['content']
     return res1 + "\n" + res2
-
-
-# def extractive_summarization(preprocessed_text, lang):
-#     if lang=="en":
-#         spacy.cli.download("en_core_web_sm")
-#         nlp = spacy.load("en_core_web_sm")
-#     elif lang=="ko":
-#         spacy.cli.download("ko_core_news_sm")
-#         nlp = spacy.load("ko_core_news_sm")
-#     nlp.add_pipe("textrank")
-#     doc = nlp(preprocessed_text)
-#     extracted_sentences = []
-#     tr = doc._.textrank
-#     for sent in tr.summary(limit_phrases=50, limit_sentences=30):
-#         extracted_sentences.append(sent.text)
-#     return extracted_sentences

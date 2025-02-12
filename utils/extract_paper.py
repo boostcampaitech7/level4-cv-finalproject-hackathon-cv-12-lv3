@@ -1,5 +1,6 @@
 import json
 
+
 def extract_key_sections(full_text: str, lang) -> dict:
     """전체 텍스트에서 필요한 섹션들을 추출"""
     SECTION_KEYWORDS = {
@@ -31,14 +32,15 @@ def extract_key_sections(full_text: str, lang) -> dict:
         elif any(keyword in line_lower for keyword in SECTION_KEYWORDS['introduction'][lang]):
             current_section = 'introduction_section'
             continue
-            
+
         if not sections['title_section'] and len(line.strip()) > 0:
             sections['title_section'] += line + '\n'
-            
+
         if current_section:
             sections[current_section] += line + '\n'
 
     return sections
+
 
 def extract_paper_metadata(paper_text: str, completion_executor, lang) -> dict:
     sections = extract_key_sections(paper_text, lang)
@@ -48,7 +50,7 @@ def extract_paper_metadata(paper_text: str, completion_executor, lang) -> dict:
     print(sections['title_section'])
     print("\nAbstract Section:")
     print(sections['abstract_section'])
-    
+
     default_metadata = {
         "title": "",
         "authors": "",
@@ -74,16 +76,16 @@ def extract_paper_metadata(paper_text: str, completion_executor, lang) -> dict:
     초록 섹션:
     {abstract_section}
     """
-    
+
     try:
         response = completion_executor.execute({
             "messages": [
                 {
-                    "role": "system", 
+                    "role": "system",
                     "content": "당신은 논문 메타데이터 추출 전문가입니다. 요청된 형식의 JSON만 정확히 반환하세요."
                 },
                 {
-                    "role": "user", 
+                    "role": "user",
                     "content": prompt.format(
                         title_section=sections['title_section'],
                         abstract_section=sections['abstract_section']
@@ -91,23 +93,23 @@ def extract_paper_metadata(paper_text: str, completion_executor, lang) -> dict:
                 }
             ]
         })
-        
+
         if response and 'content' in response:
             content = response['content'].strip()
-            
+
             # 마크다운 코드 블록 제거
             if '```' in content:
                 content = content.split('```')
                 if 'json' in content:
                     content = content.replace('json', '', 1)
                 content = content.strip()
-            
+
             # JSON 시작과 끝 부분만 추출
             start_idx = content.find('{')
             end_idx = content.rfind('}') + 1
             if start_idx != -1 and end_idx > 0:
                 content = content[start_idx:end_idx]
-            
+
             try:
                 metadata = json.loads(content)
                 # 필수 필드 확인 및 기본값으로 대체
