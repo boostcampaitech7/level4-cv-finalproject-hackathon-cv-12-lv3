@@ -252,6 +252,6 @@ pip install -r requirements.txt
 
 [발표 자료](https://docs.google.com/presentation/d/18uIdExpUtLEqidLbUk1QPIW2W_cHzowYZvR8cgwd1Xk/edit?usp=sharing)
 
-[발표영상]()
+[발표영상](https://youtu.be/yDhZjUy1yjg)
 
 <br/>
