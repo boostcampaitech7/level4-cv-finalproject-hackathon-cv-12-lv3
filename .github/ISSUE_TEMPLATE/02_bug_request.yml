@@ -1,0 +1,23 @@
+name: 🐛 Bug Report
+description: Bug Report for Discovered Issue
+title: "[Bug] "
+labels: ["🐞 Bug"]
+body:
+  - type: textarea
+    attributes:
+      label: 🌈 Background
+      description: 해당 버그를 발견한 상황과 짐작가는 원인이 무엇인가요?
+      placeholder: 뭐든지 적어주세요~
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: 📋 Todo
+      description: 어떤 방법으로 수정할 수 있나요?
+      placeholder: "- [ ] 이렇게 체크박스 생성해서 적으시면 됩니다~"
+
+  - type: textarea
+    attributes:
+      label: 👀 See Also
+      description: 추가적으로 작성할 것이 있나요?
